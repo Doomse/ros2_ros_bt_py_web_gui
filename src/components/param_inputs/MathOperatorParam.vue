@@ -40,7 +40,6 @@ const edit_node_store = useEditNodeStore()
 const props = defineProps<{
     category: 'options',
     data_key: string,
-    val_type: 'operator' | 'operand'
     op_type: 'unary' | 'binary'
 }>()
 
@@ -64,83 +63,70 @@ function handleChange(event: Event) {
 
 // Lookup for all possible values for operators and operands
 const options = {
-    operator: {
-        unary: [
-            'not',
-            'inv',
-            '~',
-            'neg',
-            '-',
-            'pos',
-            '+',
-            'exp',
-            'expm1',
-            'log',
-            'log1p',
-            'log10',
-            'ceil',
-            'fabs',
-            'factorial',
-            'floor',
-            'sqrt',
-            'acos',
-            'asin',
-            'atan',
-            'acosh',
-            'asinh',
-            'atanh',
-            'cos',
-            'sin',
-            'tan',
-            'cosh',
-            'sinh',
-            'tanh',
-            'degrees',
-            'radians',
-            'erf',
-            'erfc',
-            'gamma',
-            'lgamma'
-        ],
-        binary: [
-            'add',
-            '+',
-            'and',
-            '&',
-            'div',
-            '/',
-            'floordiv',
-            '//',
-            'lshift',
-            '<<',
-            'mod',
-            '%',
-            'mul',
-            '*',
-            'or',
-            '|',
-            'pow',
-            '**',
-            'rshift',
-            '>>',
-            'sub',
-            '-',
-            'truediv',
-            'xor',
-            '^'
-        ]
-    },
-    operand: {
-        unary: [
-            'int',
-            'float'
-        ],
-        binary: [
-            'int',
-            'float',
-            'bool'
-        ]
-    }
+    unary: [
+        'not',
+        'inv',
+        '~',
+        'neg',
+        '-',
+        'pos',
+        '+',
+        'exp',
+        'expm1',
+        'log',
+        'log1p',
+        'log10',
+        'ceil',
+        'fabs',
+        'factorial',
+        'floor',
+        'sqrt',
+        'acos',
+        'asin',
+        'atan',
+        'acosh',
+        'asinh',
+        'atanh',
+        'cos',
+        'sin',
+        'tan',
+        'cosh',
+        'sinh',
+        'tanh',
+        'degrees',
+        'radians',
+        'erf',
+        'erfc',
+        'gamma',
+        'lgamma'
+    ],
+    binary: [
+        'add',
+        '+',
+        'and',
+        '&',
+        'div',
+        '/',
+        'floordiv',
+        '//',
+        'lshift',
+        '<<',
+        'mod',
+        '%',
+        'mul',
+        '*',
+        'or',
+        '|',
+        'pow',
+        '**',
+        'rshift',
+        '>>',
+        'sub',
+        '-',
+        'truediv',
+        'xor',
+        '^'
+    ]
 }
 
 
@@ -155,7 +141,7 @@ const options = {
         :value="(param.value.value as PyOperator).operator" 
         :disabled="editor_store.selected_subtree.is_subtree"
         >
-            <option v-for="operator_option in options[props.val_type][props.op_type]" 
+            <option v-for="operator_option in options[props.op_type]" 
             :key="operator_option" :value="operator_option"
             >
                 {{ operator_option }}
