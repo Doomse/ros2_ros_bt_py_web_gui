@@ -58,7 +58,11 @@ const topic_ref_param = computed<ParamData | undefined>(() =>
 
 const fields = ref<Record<string, never>>({})
 
-const field_types = ref<Record<string, never>>({})
+const field_types = ref<Record<string, any>>({})
+
+// This is set by the message_fields callbacks
+// and used to force full re-renders of the nested form
+const msg_name = ref<string>('')
 
 function fetchRosMessageDefault() {
   if (topic_ref_param.value === undefined) {
@@ -76,6 +80,7 @@ function fetchRosMessageDefault() {
         fields.value = JSON.parse(response.fields)
         field_types.value = JSON.parse(response.field_types)
         edit_node_store.updateParamValue(props.category, props.data_key, fields.value)
+        msg_name.value = message_type
         notify({
           title: 'Successfully loaded message fields!',
           text: '',
@@ -114,13 +119,13 @@ function fetchRosMessageDefault() {
       Fetch default message fields
     </button>
   </div>
-  <div class="list-group">
+  <div class="list-group d-table w-100">
     <RosMsgComponent
-        v-for="key in Object.keys(field_types)"
-        :key="key"
-        :field_dict="fields"
-        :field_types="field_types[key]"
-        :field_key="[key]"
+      :key="msg_name"
+      :field_dict="fields"
+      :field_types="field_types"
+      :field_key="[]"
+      :render_content="true"
     />
   </div>
 </template>
