@@ -30,7 +30,7 @@
 <script setup lang="ts">
 import type { OptionData } from '@/types/types'
 import TypeParam from './param_inputs/TypeParam.vue'
-import JSONInput from './JSONInput.vue'
+import JSONInput from './param_inputs/JSONInput.vue'
 import MathOperatorParam from './param_inputs/MathOperatorParam.vue'
 import MathOperandParam from './param_inputs/MathOperandParam.vue'
 import { computed } from 'vue'
@@ -53,6 +53,7 @@ import {
 import RosTypeParam from './param_inputs/RosTypeParam.vue'
 import RosNameParam from './param_inputs/RosNameParam.vue'
 import { getTypeAndInfo, unset_ref_str } from '@/utils'
+import RosMsgInput from './param_inputs/RosMsgInput.vue'
 
 const props = defineProps<{
   category: 'options'
@@ -71,6 +72,13 @@ const param_type = computed<string>(() => {
     return ''
   }
   return getTypeAndInfo(param.value.value.type)[0]
+})
+
+const param_info = computed<string>(() => {
+  if (param.value === undefined) {
+    return ''
+  }
+  return getTypeAndInfo(param.value.value.type)[1]
 })
 
 // Below lists the data types that are handled by <input>...
@@ -238,6 +246,12 @@ function onFocus() {
       :category="props.category"
       :data_key="props.data_key"
       :type="'action'"
+    />
+
+    <RosMsgInput 
+      v-else-if="param_type === 'dict' && param_info === 'ros'"
+      :category="props.category"
+      :data_key="props.data_key"
     />
 
     <div v-else class="form-group position-relative">
