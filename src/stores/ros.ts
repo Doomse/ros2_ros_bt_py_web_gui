@@ -27,7 +27,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-import { ref, shallowRef } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { Service, Topic, Ros } from 'roslib'
 import type {
@@ -93,6 +93,7 @@ import type { ChangeTreeNameRequest, ChangeTreeNameResponse } from '@/types/serv
 import { useNodesStore } from './nodes'
 import { useEditorStore } from './editor'
 
+
 export const useROSStore = defineStore(
   'ros',
   () => {
@@ -100,293 +101,258 @@ export const useROSStore = defineStore(
     const packages_store = usePackageStore()
     const nodes_store = useNodesStore()
     const editor_store = useEditorStore()
-    const ros = shallowRef<Ros>(new Ros({}))
-    const connected = ref<boolean>(false)
+    const ros = new Ros({})
+    const connected = computed<boolean>(() => ros.isConnected)
     const url = ref<string>('ws://' + window.location.hostname + ':9090')
     const namespace = ref<string>('')
     const available_namespaces = ref<string[]>(['/'])
 
-    const services_for_type_service = shallowRef<
-      Service<ServicesForTypeRequest, ServicesForTypeResponse>
-    >(
+    let services_for_type_service :
+      Service<ServicesForTypeRequest, ServicesForTypeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: '/rosapi/services_for_type',
         serviceType: 'rosapi/ServicesForType'
       })
-    )
 
-    const load_tree_service = shallowRef<Service<LoadTreeRequest, LoadTreeResponse>>(
+    let load_tree_service :
+      Service<LoadTreeRequest, LoadTreeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'load_tree',
         serviceType: 'ros_bt_py_interfaces/srv/LoadTree'
       })
-    )
 
-    const fix_yaml_service = shallowRef<Service<FixYamlRequest, FixYamlResponse>>(
+    let fix_yaml_service : Service<FixYamlRequest, FixYamlResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'fix_yaml',
         serviceType: 'ros_bt_py_interfaces/srv/FixYaml'
       })
-    )
 
-    const control_tree_execution_service = shallowRef<
-      Service<ControlTreeExecutionRequest, ControlTreeExecutionResponse>
-    >(
+    let control_tree_execution_service :
+      Service<ControlTreeExecutionRequest, ControlTreeExecutionResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'control_tree_execution',
         serviceType: 'ros_bt_py_interfaces/srv/ControlTreeExecution'
       })
-    )
 
-    const clear_tree_service = shallowRef<Service<ClearTreeRequest, ClearTreeResponse>>(
+    let clear_tree_service : Service<ClearTreeRequest, ClearTreeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'clear',
         serviceType: 'ros_bt_py_interfaces/srv/ClearTree'
       })
-    )
 
-    const set_publish_subtrees_service = shallowRef<Service<SetBoolRequest, SetBoolResponse>>(
+    let set_publish_subtrees_service : 
+      Service<SetBoolRequest, SetBoolResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'debug/set_publish_subtrees',
         serviceType: 'std_srvs/srv/SetBool'
       })
-    )
 
-    const set_publish_data_service = shallowRef<Service<SetBoolRequest, SetBoolResponse>>(
+    let set_publish_data_service : Service<SetBoolRequest, SetBoolResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'debug/set_publish_data',
         serviceType: 'std_srvs/srv/SetBool'
       })
-    )
 
-    const tree_structure_sub = shallowRef<Topic<TreeStructureList>>(
+    let tree_structure_sub : Topic<TreeStructureList> =
       new Topic({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'tree_structure_list',
         messageType: 'ros_bt_py_interfaces/msg/TreeStructureList',
         latch: true,
         reconnect_on_close: true
       })
-    )
 
-    const tree_state_sub = shallowRef<Topic<TreeStateList>>(
+    let tree_state_sub : Topic<TreeStateList> =
       new Topic({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'tree_state_list',
         messageType: 'ros_bt_py_interfaces/msg/TreeStateList',
         latch: true,
         reconnect_on_close: true
       })
-    )
 
-    const tree_data_sub = shallowRef<Topic<TreeDataList>>(
+    let tree_data_sub : Topic<TreeDataList> =
       new Topic({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'tree_data_list',
         messageType: 'ros_bt_py_interfaces/msg/TreeDataList',
         latch: true,
         reconnect_on_close: true
       })
-    )
 
-    const packages_sub = shallowRef<Topic<Packages>>(
+    let packages_sub : Topic<Packages> =
       new Topic({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'packages',
         messageType: 'ros_bt_py_interfaces/msg/Packages',
         latch: true,
         reconnect_on_close: true
       })
-    )
-    const messages_sub = shallowRef<Topic<MessageTypes>>(
+
+    let messages_sub : Topic<MessageTypes> =
       new Topic({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'message_types',
         messageType: 'ros_bt_py_interfaces/msg/MessageTypes',
         latch: true,
         reconnect_on_close: true
       })
-    )
-    const channels_sub = shallowRef<Topic<Channels>>(
+
+    let channels_sub : Topic<Channels> =
       new Topic({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'message_channels',
         messageType: 'ros_bt_py_interfaces/msg/MessageChannels',
         latch: true,
         reconnect_on_close: true
       })
-    )
 
-    const get_available_nodes_service = shallowRef<
-      Service<GetAvailableNodesRequest, GetAvailableNodesResponse>
-    >(
+    let get_available_nodes_service :
+      Service<GetAvailableNodesRequest, GetAvailableNodesResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'get_available_nodes',
         serviceType: 'ros_bt_py_interfaces/srv/GetAvailableNodes'
       })
-    )
 
-    const get_message_fields_service = shallowRef<
-      Service<GetMessageFieldsRequest, GetMessageFieldsResponse>
-    >(
+    let get_message_fields_service :
+      Service<GetMessageFieldsRequest, GetMessageFieldsResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'get_message_fields',
         serviceType: 'ros_bt_py_interfaces/srv/GetMessageFields'
       })
-    )
 
-    const unwire_data_service = shallowRef<Service<WireNodeDataRequest, WireNodeDataResponse>>(
+    let unwire_data_service : Service<WireNodeDataRequest, WireNodeDataResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'unwire_data',
         serviceType: 'ros_bt_py_interfaces/srv/WireNodeData'
       })
-    )
 
-    const remove_node_service = shallowRef<Service<RemoveNodeRequest, RemoveNodeResponse>>(
+    let remove_node_service : Service<RemoveNodeRequest, RemoveNodeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'remove_node',
         serviceType: 'ros_bt_pt_interfaces/srv/RemoveNode'
       })
-    )
 
-    const replace_node_service = shallowRef<Service<ReplaceNodeRequest, ReplaceNodeResponse>>(
+    let replace_node_service : Service<ReplaceNodeRequest, ReplaceNodeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'replace_node',
         serviceType: 'ros_bt_pt_interfaces/srv/ReplaceNode'
       })
-    )
 
-    const set_options_service = shallowRef<Service<SetOptionsRequest, SetOptionsResponse>>(
+    let set_options_service : Service<SetOptionsRequest, SetOptionsResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'set_options',
         serviceType: 'ros_bt_pt_interfaces/srv/SetOptions'
       })
-    )
 
-    const morph_node_service = shallowRef<Service<MorphNodeRequest, MorphNodeResponse>>(
+    let morph_node_service : Service<MorphNodeRequest, MorphNodeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'morph_node',
         serviceType: 'ros_bt_pt_interfaces/srv/MorphNode'
       })
-    )
 
-    const move_node_service = shallowRef<Service<MoveNodeRequest, MoveNodeResponse>>(
+    let move_node_service : Service<MoveNodeRequest, MoveNodeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'move_node',
         serviceType: 'ros_bt_py_interfaces/srv/MoveNode'
       })
-    )
 
-    const add_node_at_index_service = shallowRef<
-      Service<AddNodeAtIndexRequest, AddNodeAtIndexResponse>
-    >(
+    let add_node_at_index_service :
+      Service<AddNodeAtIndexRequest, AddNodeAtIndexResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'add_node_at_index',
         serviceType: 'ros_bt_py_interfaces/srv/AddNodeAtIndex'
       })
-    )
 
-    const wire_data_service = shallowRef<Service<WireNodeDataRequest, WireNodeDataResponse>>(
+    let wire_data_service : 
+      Service<WireNodeDataRequest, WireNodeDataResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'wire_data',
         serviceType: 'ros_bt_py_interfaces/srv/WireNodeData'
       })
-    )
 
-    const generate_subtree_service = shallowRef<
-      Service<GenerateSubtreeRequest, GenerateSubtreeResponse>
-    >(
+    let generate_subtree_service :
+      Service<GenerateSubtreeRequest, GenerateSubtreeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'generate_subtree',
         serviceType: 'ros_bt_py_interfaces/srv/GenerateSubtree'
       })
-    )
 
-    const get_storage_folders_service = shallowRef<
-      Service<GetStorageFoldersRequest, GetStorageFoldersResponse>
-    >(
+    let get_storage_folders_service :
+      Service<GetStorageFoldersRequest, GetStorageFoldersResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'get_storage_folders',
         serviceType: 'ros_bt_py_interfaces/srv/GetStorageFolders'
       })
-    )
 
-    const get_folder_structure_service = shallowRef<
-      Service<GetFolderStructureRequest, GetFolderStructureResponse>
-    >(
+    let get_folder_structure_service :
+      Service<GetFolderStructureRequest, GetFolderStructureResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'get_folder_structure',
         serviceType: 'ros_bt_py_interfaces/srv/GetFolderStructure'
       })
-    )
 
-    const get_package_structure_service = shallowRef<
-      Service<GetPackageStructureRequest, GetPackageStructureResponse>
-    >(
+    let get_package_structure_service :
+      Service<GetPackageStructureRequest, GetPackageStructureResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'get_package_structure',
         serviceType: 'ros_bt_py_interfaces/srv/GetPackageStructure'
       })
-    )
 
-    const save_tree_service = shallowRef<Service<SaveTreeRequest, SaveTreeResponse>>(
+    let save_tree_service : 
+      Service<SaveTreeRequest, SaveTreeResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'save_tree',
         serviceType: 'ros_bt_py_interfaces/srv/SaveTree'
       })
-    )
 
-    const change_tree_name_service = shallowRef<
-      Service<ChangeTreeNameRequest, ChangeTreeNameResponse>
-    >(
+    let change_tree_name_service :
+      Service<ChangeTreeNameRequest, ChangeTreeNameResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'change_tree_name',
         serviceType: 'ros_bt_py_interfaces/srv/ChangeTreeName'
       })
-    )
 
-    const load_tree_from_path_service = shallowRef<
-      Service<LoadTreeFromPathRequest, LoadTreeFromPathResponse>
-    >(
+    let load_tree_from_path_service :
+      Service<LoadTreeFromPathRequest, LoadTreeFromPathResponse> =
       new Service({
-        ros: ros.value,
+        ros: ros,
         name: namespace.value + 'load_tree_from_path',
         serviceType: 'ros_bt_py_interfaces/srv/LoadTreeFromPath'
       })
-    )
 
-    ros.value.on('connection', () => {
+    ros.on('connection', () => {
       hasConnected()
     })
 
-    ros.value.on('close', () => {
+    ros.on('close', () => {
       hasDisconnected()
     })
 
-    ros.value.on('error', () => {
+    ros.on('error', () => {
       notify({
         title: 'ROS connection error!',
         type: 'error'
@@ -394,206 +360,206 @@ export const useROSStore = defineStore(
     })
 
     function updateROSServices() {
-      tree_structure_sub.value.unsubscribe()
-      tree_structure_sub.value.removeAllListeners()
-      tree_structure_sub.value = new Topic({
-        ros: ros.value,
+      tree_structure_sub.unsubscribe()
+      tree_structure_sub.removeAllListeners()
+      tree_structure_sub = new Topic({
+        ros: ros,
         name: namespace.value + 'tree_structure_list',
         messageType: 'ros_bt_py_interfaces/msg/TreeStructureList',
         latch: true,
         reconnect_on_close: true
       })
 
-      tree_state_sub.value.unsubscribe()
-      tree_state_sub.value.removeAllListeners()
-      tree_state_sub.value = new Topic({
-        ros: ros.value,
+      tree_state_sub.unsubscribe()
+      tree_state_sub.removeAllListeners()
+      tree_state_sub = new Topic({
+        ros: ros,
         name: namespace.value + 'tree_state_list',
         messageType: 'ros_bt_py_interfaces/msg/TreeStateList',
         latch: true,
         reconnect_on_close: true
       })
 
-      tree_data_sub.value.unsubscribe()
-      tree_data_sub.value.removeAllListeners()
-      tree_data_sub.value = new Topic({
-        ros: ros.value,
+      tree_data_sub.unsubscribe()
+      tree_data_sub.removeAllListeners()
+      tree_data_sub = new Topic({
+        ros: ros,
         name: namespace.value + 'tree_data_list',
         messageType: 'ros_bt_py_interfaces/msg/TreeDataList',
         latch: true,
         reconnect_on_close: true
       })
 
-      messages_sub.value.unsubscribe()
-      messages_sub.value.removeAllListeners()
-      messages_sub.value = new Topic({
-        ros: ros.value,
+      messages_sub.unsubscribe()
+      messages_sub.removeAllListeners()
+      messages_sub = new Topic({
+        ros: ros,
         name: namespace.value + 'message_types',
         messageType: 'ros_bt_py_interfaces/msg/MessageTypes',
         latch: true,
         reconnect_on_close: true
       })
 
-      packages_sub.value.unsubscribe()
-      packages_sub.value.removeAllListeners()
-      packages_sub.value = new Topic({
-        ros: ros.value,
+      packages_sub.unsubscribe()
+      packages_sub.removeAllListeners()
+      packages_sub = new Topic({
+        ros: ros,
         name: namespace.value + 'packages',
         messageType: 'ros_bt_py_interfaces/msg/Packages',
         latch: true,
         reconnect_on_close: true
       })
 
-      channels_sub.value.unsubscribe()
-      channels_sub.value.removeAllListeners()
-      channels_sub.value = new Topic({
-        ros: ros.value,
+      channels_sub.unsubscribe()
+      channels_sub.removeAllListeners()
+      channels_sub = new Topic({
+        ros: ros,
         name: namespace.value + 'message_channels',
         messageType: 'ros_bt_py_interfaces/msg/MessageChannels',
         latch: true,
         reconnect_on_close: true
       })
 
-      set_publish_subtrees_service.value = new Service({
-        ros: ros.value,
+      set_publish_subtrees_service = new Service({
+        ros: ros,
         name: namespace.value + 'debug/set_publish_subtrees',
         serviceType: 'std_srvs/srv/SetBool'
       })
 
-      set_publish_data_service.value = new Service({
-        ros: ros.value,
+      set_publish_data_service = new Service({
+        ros: ros,
         name: namespace.value + 'debug/set_publish_data',
         serviceType: 'std_srvs/srv/SetBool'
       })
 
-      services_for_type_service.value = new Service({
-        ros: ros.value,
+      services_for_type_service = new Service({
+        ros: ros,
         name: '/rosapi/services_for_type',
         serviceType: 'rosapi/ServicesForType'
       })
 
-      load_tree_service.value = new Service({
-        ros: ros.value,
+      load_tree_service = new Service({
+        ros: ros,
         name: namespace.value + 'load_tree',
         serviceType: 'ros_bt_py_interfaces/srv/LoadTree'
       })
 
-      fix_yaml_service.value = new Service({
-        ros: ros.value,
+      fix_yaml_service = new Service({
+        ros: ros,
         name: namespace.value + 'fix_yaml',
         serviceType: 'ros_bt_py_interfaces/srv/FixYaml'
       })
 
-      control_tree_execution_service.value = new Service({
-        ros: ros.value,
+      control_tree_execution_service = new Service({
+        ros: ros,
         name: namespace.value + 'control_tree_execution',
         serviceType: 'ros_bt_py_interfaces/srv/ControlTreeExecution'
       })
 
-      clear_tree_service.value = new Service({
-        ros: ros.value,
+      clear_tree_service = new Service({
+        ros: ros,
         name: namespace.value + 'clear',
         serviceType: 'ros_bt_py_interfaces/srv/ClearTree'
       })
 
-      get_available_nodes_service.value = new Service({
-        ros: ros.value,
+      get_available_nodes_service = new Service({
+        ros: ros,
         name: namespace.value + 'get_available_nodes',
         serviceType: 'ros_bt_py_interfaces/srv/GetAvailableNodes'
       })
 
-      get_message_fields_service.value = new Service({
-        ros: ros.value,
+      get_message_fields_service = new Service({
+        ros: ros,
         name: namespace.value + 'get_message_fields',
         serviceType: 'ros_bt_py_interfaces/srv/GetMessageFields'
       })
 
-      unwire_data_service.value = new Service({
-        ros: ros.value,
+      unwire_data_service = new Service({
+        ros: ros,
         name: namespace.value + 'unwire_data',
         serviceType: 'ros_bt_py_interfaces/srv/WireNodeData'
       })
 
-      remove_node_service.value = new Service({
-        ros: ros.value,
+      remove_node_service = new Service({
+        ros: ros,
         name: namespace.value + 'remove_node',
         serviceType: 'ros_bt_py_interfaces/srv/RemoveNode'
       })
 
-      replace_node_service.value = new Service({
-        ros: ros.value,
+      replace_node_service = new Service({
+        ros: ros,
         name: namespace.value + 'replace_node',
         serviceType: 'ros_bt_pt_interfaces/srv/ReplaceNode'
       })
 
-      set_options_service.value = new Service({
-        ros: ros.value,
+      set_options_service = new Service({
+        ros: ros,
         name: namespace.value + 'set_options',
         serviceType: 'ros_bt_py_interfaces/srv/SetOptions'
       })
 
-      morph_node_service.value = new Service({
-        ros: ros.value,
+      morph_node_service = new Service({
+        ros: ros,
         name: namespace.value + 'morph_node',
         serviceType: 'ros_bt_py_interfaces/srv/MorphNode'
       })
 
-      generate_subtree_service.value = new Service({
-        ros: ros.value,
+      generate_subtree_service = new Service({
+        ros: ros,
         name: namespace.value + 'generate_subtree',
         serviceType: 'ros_bt_py_interfaces/srv/GenerateSubtree'
       })
 
-      wire_data_service.value = new Service({
-        ros: ros.value,
+      wire_data_service = new Service({
+        ros: ros,
         name: namespace.value + 'wire_data',
         serviceType: 'ros_bt_py_interfaces/srv/WireNodeData'
       })
 
-      add_node_at_index_service.value = new Service({
-        ros: ros.value,
+      add_node_at_index_service = new Service({
+        ros: ros,
         name: namespace.value + 'add_node_at_index',
         serviceType: 'ros_bt_py_interfaces/srv/AddNodeAtIndex'
       })
 
-      move_node_service.value = new Service({
-        ros: ros.value,
+      move_node_service = new Service({
+        ros: ros,
         name: namespace.value + 'move_node',
         serviceType: 'ros_bt_py_interfaces/srv/MoveNode'
       })
 
-      get_storage_folders_service.value = new Service({
-        ros: ros.value,
+      get_storage_folders_service = new Service({
+        ros: ros,
         name: namespace.value + 'get_storage_folders',
         serviceType: 'ros_bt_py_interfaces/srv/GetStorageFolders'
       })
 
-      get_folder_structure_service.value = new Service({
-        ros: ros.value,
+      get_folder_structure_service = new Service({
+        ros: ros,
         name: namespace.value + 'get_folder_structure',
         serviceType: 'ros_bt_py_interfaces/srv/GetFolderStructure'
       })
 
-      get_package_structure_service.value = new Service({
-        ros: ros.value,
+      get_package_structure_service = new Service({
+        ros: ros,
         name: namespace.value + 'get_package_structure',
         serviceType: 'ros_bt_py_interfaces/srv/GetPackageStructure'
       })
 
-      save_tree_service.value = new Service({
-        ros: ros.value,
+      save_tree_service = new Service({
+        ros: ros,
         name: namespace.value + 'save_tree',
         serviceType: 'ros_bt_py_interfaces/srv/SaveTree'
       })
 
-      change_tree_name_service.value = new Service({
-        ros: ros.value,
+      change_tree_name_service = new Service({
+        ros: ros,
         name: namespace.value + 'change_tree_name',
         serviceType: 'ros_bt_py_interfaces/srv/ChangeTreeName'
       })
 
-      load_tree_from_path_service.value = new Service({
-        ros: ros.value,
+      load_tree_from_path_service = new Service({
+        ros: ros,
         name: namespace.value + 'load_tree_from_path',
         serviceType: 'ros_bt_py_interfaces/srv/LoadTreeFromPath'
       })
@@ -602,7 +568,7 @@ export const useROSStore = defineStore(
     }
 
     function connect() {
-      ros.value.connect(url.value)
+      ros.connect(url.value)
     }
 
     function setUrl(new_url: string) {
@@ -610,7 +576,6 @@ export const useROSStore = defineStore(
     }
 
     function hasConnected() {
-      connected.value = true
       notify({
         title: 'ROS connection established!',
         type: 'success'
@@ -618,7 +583,6 @@ export const useROSStore = defineStore(
     }
 
     function hasDisconnected() {
-      connected.value = false
       messages_store.areMessagesAvailable(false)
       packages_store.arePackagesAvailable(false)
 

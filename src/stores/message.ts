@@ -45,7 +45,7 @@ export const useMessasgeStore = defineStore('messages', () => {
     useExtendedSearch: true
   } as IFuseOptions<string>
   const messages = ref<string[]>([])
-  const messages_fuse = ref<Fuse<string>>(new Fuse([], messages_fuse_options))
+  const messages_fuse : Fuse<string> = new Fuse([], messages_fuse_options)
   const messages_available = ref<boolean>(false)
 
   // These additional fuses are meant to substitute/replace the above messages_fuse
@@ -58,15 +58,15 @@ export const useMessasgeStore = defineStore('messages', () => {
   ) as unknown as IFuseOptions<Channel>
   ros_name_fuse_options.keys = ['name', 'type']
 
-  const ros_topic_type_fuse = ref<Fuse<string>>(new Fuse([], ros_type_fuse_options))
-  const ros_service_type_fuse = ref<Fuse<string>>(new Fuse([], ros_type_fuse_options))
-  const ros_action_type_fuse = ref<Fuse<string>>(new Fuse([], ros_type_fuse_options))
+  const ros_topic_type_fuse : Fuse<string> = new Fuse([], ros_type_fuse_options)
+  const ros_service_type_fuse : Fuse<string> = new Fuse([], ros_type_fuse_options)
+  const ros_action_type_fuse : Fuse<string> = new Fuse([], ros_type_fuse_options)
 
-  const ros_all_messages_fuse = ref<Fuse<string>>(new Fuse([], ros_type_fuse_options))
+  const ros_all_messages_fuse : Fuse<string> = new Fuse([], ros_type_fuse_options)
 
-  const ros_topic_name_fuse = ref<Fuse<Channel>>(new Fuse([], ros_name_fuse_options))
-  const ros_service_name_fuse = ref<Fuse<Channel>>(new Fuse([], ros_name_fuse_options))
-  const ros_action_name_fuse = ref<Fuse<Channel>>(new Fuse([], ros_name_fuse_options))
+  const ros_topic_name_fuse : Fuse<Channel> = new Fuse([], ros_name_fuse_options)
+  const ros_service_name_fuse : Fuse<Channel> = new Fuse([], ros_name_fuse_options)
+  const ros_action_name_fuse : Fuse<Channel> = new Fuse([], ros_name_fuse_options)
 
   function areMessagesAvailable(available: boolean) {
     messages_available.value = available
@@ -81,35 +81,35 @@ export const useMessasgeStore = defineStore('messages', () => {
   }
 
   function addServiceMessages(message: string): void {
-    ros_all_messages_fuse.value.add(message + '_Request')
-    ros_all_messages_fuse.value.add(message + '_Response')
+    ros_all_messages_fuse.add(message + '_Request')
+    ros_all_messages_fuse.add(message + '_Response')
   }
 
   function addActionMessages(message: string): void {
-    ros_all_messages_fuse.value.add(message + '_Goal')
-    ros_all_messages_fuse.value.add(message + '_Result')
-    ros_all_messages_fuse.value.add(message + '_Feedback')
+    ros_all_messages_fuse.add(message + '_Goal')
+    ros_all_messages_fuse.add(message + '_Result')
+    ros_all_messages_fuse.add(message + '_Feedback')
   }
 
   function updateAvailableMessages(new_messages: MessageTypes) {
     messages.value = []
-    ros_topic_type_fuse.value.setCollection(new_messages.topics)
-    ros_service_type_fuse.value.setCollection(new_messages.services)
-    ros_action_type_fuse.value.setCollection(new_messages.actions)
+    ros_topic_type_fuse.setCollection(new_messages.topics)
+    ros_service_type_fuse.setCollection(new_messages.services)
+    ros_action_type_fuse.setCollection(new_messages.actions)
 
-    ros_all_messages_fuse.value.setCollection(new_messages.topics)
+    ros_all_messages_fuse.setCollection(new_messages.topics)
     new_messages.services.forEach(addServiceMessages)
     new_messages.actions.forEach(addActionMessages)
 
     new_messages.topics.forEach(addMessageTypes)
 
-    messages_fuse.value.setCollection(messages.value)
+    messages_fuse.setCollection(messages.value)
   }
 
   function updateMessageChannels(new_channels: Channels) {
-    ros_topic_name_fuse.value.setCollection(new_channels.topics)
-    ros_service_name_fuse.value.setCollection(new_channels.services)
-    ros_action_name_fuse.value.setCollection(new_channels.actions)
+    ros_topic_name_fuse.setCollection(new_channels.topics)
+    ros_service_name_fuse.setCollection(new_channels.services)
+    ros_action_name_fuse.setCollection(new_channels.actions)
   }
 
   return {
