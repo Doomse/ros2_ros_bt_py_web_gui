@@ -152,9 +152,20 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     node_is_morphed.value = false
 
     new_node_options.value = new_selected_node.options.map((data) => {
+      const opt_value = getDefaultValue(
+        prettyprint_type(data.serialized_type),
+        new_selected_node.options
+      )
+      if (data.serialized_value) {
+        if (opt_value.type.startsWith('type')) {
+          opt_value.value = prettyprint_type(data.serialized_value)
+        } else {
+          opt_value.value = JSON.parse(data.serialized_value)
+        }
+      }
       return {
         key: data.key,
-        value: getDefaultValue(prettyprint_type(data.serialized_type), new_selected_node.options)
+        value: opt_value,
       } as OptionData
     })
     new_node_inputs.value = new_selected_node.inputs.map((data) =>
