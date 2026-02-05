@@ -38,10 +38,11 @@ import SelectLocationModal from '@/components/modals/SelectLocationModal.vue'
 import { ref } from 'vue'
 import { useEditNodeStore } from '@/stores/edit_node'
 import type { TreeStructure, UUIDString } from '@/types/types'
-import { NameConflictHandler, parseConflictHandler, rosToUuid, uuidToRos } from '@/utils'
+import { NameConflictHandler, parseConflictHandler, uuidToRos } from '@/utils'
 import type { SaveTreeRequest, SaveTreeResponse } from '@/types/services/SaveTree'
 import { removeNode } from '@/tree_manipulation'
 import { useEditorStore } from '@/stores/editor'
+import { findNodeInTreeList, getNodeStructures } from '@/tree_selection'
 
 const ros_store = useROSStore()
 const editor_store = useEditorStore()
@@ -70,9 +71,7 @@ async function deleteNodes() {
 
   const p_list: Promise<void>[] = []
   edit_node_store.selected_node_ids.forEach((node_id: UUIDString) => {
-    const node = editor_store.current_tree.structure!.nodes.find(
-      (node) => rosToUuid(node.node_id) === node_id
-    )
+    const node = findNodeInTreeList(editor_store.tree_structure_list, getNodeStructures, node_id)
     let name = node_id
     if (node !== undefined) {
       name = node.name

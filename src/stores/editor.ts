@@ -37,12 +37,10 @@ import type {
   TreeStructure,
   BTEditorNode,
   DataEdgeTerminal,
-  Tree,
   TreeState,
   TreeData,
   UUIDString
 } from '@/types/types'
-import { rosToUuid } from '@/utils'
 
 export enum EditorSkin {
   DARK = 'darkmode',
@@ -84,18 +82,6 @@ export const useEditorStore = defineStore(
     const selected_tree = ref<UUIDString>(uuid.NIL)
 
     const has_selected_subtree = computed<boolean>(() => selected_tree.value !== uuid.NIL)
-
-    const current_tree = computed<Tree>(() => {
-      return {
-        structure: tree_structure_list.value.find(
-          (tree) => rosToUuid(tree.tree_id) === selected_tree.value
-        ),
-        state: tree_state_list.value.find(
-          (tree) => rosToUuid(tree.tree_id) === selected_tree.value
-        ),
-        data: tree_data_list.value.find((tree) => rosToUuid(tree.tree_id) === selected_tree.value)
-      }
-    })
 
     const quick_save_location = ref<string>('')
 
@@ -186,27 +172,13 @@ export const useEditorStore = defineStore(
       selected_edge.value = undefined
     }
 
-    function findTree(id: UUIDString): TreeStructure | undefined {
-      return tree_structure_list.value.find((struc) => rosToUuid(struc.tree_id) === id)
-    }
-
-    function findTreeContainingNode(id: UUIDString): TreeStructure | undefined {
-      return tree_structure_list.value.find(
-        (t_struc) =>
-          t_struc.nodes.find((n_struc) => rosToUuid(n_struc.node_id) === id) !== undefined
-      )
-    }
-
     return {
       selected_tree,
       has_selected_subtree,
-      current_tree,
       publish_subtrees,
       publish_data,
       debug,
       tree_structure_list,
-      findTree,
-      findTreeContainingNode,
       tree_state_list,
       tree_data_list,
       running_commands,

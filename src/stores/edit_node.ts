@@ -47,10 +47,10 @@ import {
   getDefaultValue,
   parseOptionRef,
   prettyprint_type,
-  rosToUuid,
   serializeNodeOptions,
   uuidToRos
 } from '@/utils'
+import { findNodeInTreeList, getNodeStructures } from '@/tree_selection'
 
 export enum EditorSelectionSource {
   NONE = 'none',
@@ -177,8 +177,10 @@ export const useEditNodeStore = defineStore('edit_node', () => {
       }
     }
 
-    const new_selected_node = editor_store.current_tree.structure!.nodes.find(
-      (x: NodeStructure) => rosToUuid(x.node_id) === new_selected_node_id
+    const new_selected_node = findNodeInTreeList(
+      editor_store.tree_structure_list,
+      getNodeStructures,
+      new_selected_node_id
     )
 
     if (new_selected_node === undefined) {

@@ -159,12 +159,6 @@ export type TreeDataList = {
   tree_data: TreeData[]
 }
 
-export type Tree = {
-  structure?: TreeStructure
-  state?: TreeState
-  data?: TreeData
-}
-
 export type DataEdgePoint = {
   x: number
   y: number
