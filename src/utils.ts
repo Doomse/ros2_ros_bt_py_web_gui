@@ -43,10 +43,9 @@ import type {
   TreeState,
   UUIDMsg,
   UUIDString,
-  TreeStructure,
-  NodeStructure,
   RosTime,
-  PyB64
+  PyB64,
+  Wiring
 } from './types/types'
 import { IOKind } from './types/types'
 
@@ -72,8 +71,15 @@ export function compareRosUuid(u1: UUIDMsg, u2: UUIDMsg): boolean {
   return rosToUuid(u1) === rosToUuid(u2)
 }
 
-export function findNode(tree: TreeStructure, node_id: UUIDString): NodeStructure | undefined {
-  return tree.nodes.find((node) => rosToUuid(node.node_id) === node_id)
+export function compareWirings(w1: Wiring, w2: Wiring): boolean {
+  return (
+    compareRosUuid(w1.source.node_id, w2.source.node_id) &&
+    w1.source.data_kind === w2.source.data_kind &&
+    w1.source.data_key === w2.source.data_key &&
+    compareRosUuid(w1.target.node_id, w2.target.node_id) &&
+    w1.target.data_kind === w2.target.data_kind &&
+    w1.target.data_key === w2.target.data_key
+  )
 }
 
 export function typesCompatible(a: DataEdgeTerminal, b: DataEdgeTerminal) {

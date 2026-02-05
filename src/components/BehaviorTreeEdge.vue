@@ -35,7 +35,13 @@ import type { WireNodeDataRequest, WireNodeDataResponse } from '@/types/services
 import { notify } from '@kyvg/vue3-notification'
 import { computed } from 'vue'
 import type { WiringData } from '@/types/types'
-import { compareRosUuid, prettyprint_type, rosToUuid, prettyprint_value } from '@/utils'
+import { prettyprint_type, rosToUuid, prettyprint_value } from '@/utils'
+import {
+  getNodeStructures,
+  findNodeInTreeList,
+  findWiringInTreeList,
+  getWiringData
+} from '@/tree_selection'
 
 const ros_store = useROSStore()
 const editor_store = useEditorStore()
@@ -45,8 +51,10 @@ const source_name = computed<string>(() => {
   if (editor_store.selected_edge === undefined) {
     return ''
   }
-  const source_node = editor_store.current_tree.structure!.nodes.find(
-    (node) => rosToUuid(node.node_id) === rosToUuid(editor_store.selected_edge!.source.node_id)
+  const source_node = findNodeInTreeList(
+    editor_store.tree_structure_list,
+    getNodeStructures,
+    rosToUuid(editor_store.selected_edge.source.node_id)
   )
   if (source_node === undefined) {
     return ''
@@ -58,8 +66,10 @@ const target_name = computed<string>(() => {
   if (editor_store.selected_edge === undefined) {
     return ''
   }
-  const target_node = editor_store.current_tree.structure!.nodes.find(
-    (node) => rosToUuid(node.node_id) === rosToUuid(editor_store.selected_edge!.target.node_id)
+  const target_node = findNodeInTreeList(
+    editor_store.tree_structure_list,
+    getNodeStructures,
+    rosToUuid(editor_store.selected_edge.target.node_id)
   )
   if (target_node === undefined) {
     return ''
@@ -68,21 +78,14 @@ const target_name = computed<string>(() => {
 })
 
 const edge_data = computed<WiringData | undefined>(() => {
-  if (editor_store.selected_edge === undefined || editor_store.current_tree.data === undefined) {
+  if (editor_store.selected_edge === undefined) {
     return undefined
   }
-  const edge = editor_store.selected_edge
-  return editor_store.current_tree.data.wiring_data.find((item) => {
-    const wiring = item.wiring
-    return (
-      compareRosUuid(wiring.source.node_id, edge.source.node_id) &&
-      wiring.source.data_kind === edge.source.data_kind &&
-      wiring.source.data_key === edge.source.data_key &&
-      compareRosUuid(wiring.target.node_id, edge.target.node_id) &&
-      wiring.target.data_kind === edge.target.data_kind &&
-      wiring.target.data_key === edge.target.data_key
-    )
-  })
+  return findWiringInTreeList(
+    editor_store.tree_data_list,
+    getWiringData,
+    editor_store.selected_edge
+  )
 })
 
 function onClickDelete() {
@@ -97,21 +100,16 @@ function onClickDelete() {
       ]
     } as WireNodeDataRequest,
     (response: WireNodeDataResponse) => {
-      const source_name = editor_store.current_tree.structure!.nodes.find((node) =>
-        compareRosUuid(edge.source.node_id, node.node_id)
-      )!.name
-      const target_name = editor_store.current_tree.structure!.nodes.find((node) =>
-        compareRosUuid(edge.target.node_id, node.node_id)
-      )!.name
       if (response.success) {
         notify({
-          title: 'Removed data edge: ' + source_name + ' -> ' + target_name + '!',
+          title: 'Removed data edge: ' + source_name.value + ' -> ' + target_name.value + '!',
           type: 'success'
         })
         editor_store.unselectEdge()
       } else {
         notify({
-          title: 'Failed to remove data edge: ' + source_name + ' -> ' + target_name + '!',
+          title:
+            'Failed to remove data edge: ' + source_name.value + ' -> ' + target_name.value + '!',
           text: response.error_message,
           type: 'warn'
         })

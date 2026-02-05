@@ -30,8 +30,9 @@
 <script setup lang="ts">
 import { useEditNodeStore } from '@/stores/edit_node'
 import { useEditorStore } from '@/stores/editor'
-import type { IOData, NodeDataLocation, Wiring } from '@/types/types'
-import { compareRosUuid } from '@/utils'
+import { findNodeInTreeList, findTreeContainingNode, getNodeStructures } from '@/tree_selection'
+import type { TreeStructure, IOData, NodeDataLocation, Wiring } from '@/types/types'
+import { compareRosUuid, rosToUuid } from '@/utils'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -53,11 +54,22 @@ const param = computed<IOData | undefined>(() => {
   }
 })
 
+const containing_tree = computed<TreeStructure | undefined>(() => {
+  if (edit_node_store.selected_node === undefined) {
+    return undefined
+  }
+  return findTreeContainingNode(
+    editor_store.tree_structure_list,
+    getNodeStructures,
+    edit_node_store.selected_node.node_id
+  )
+})
+
 const connected_edges = computed<Wiring[]>(() => {
-  if (editor_store.current_tree.structure === undefined) {
+  if (containing_tree.value === undefined) {
     return []
   }
-  return editor_store.current_tree.structure.data_wirings.filter(
+  return containing_tree.value.data_wirings.filter(
     (wiring) => matchEndpoint(wiring.source) || matchEndpoint(wiring.target)
   )
 })
@@ -84,8 +96,10 @@ function printOtherEndpoint(wiring: Wiring): string {
   if (endpoint === null) {
     return 'Other Endpoint'
   }
-  const node = editor_store.current_tree.structure!.nodes.find((node) =>
-    compareRosUuid(node.node_id, endpoint.node_id)
+  const node = findNodeInTreeList(
+    editor_store.tree_structure_list,
+    getNodeStructures,
+    rosToUuid(endpoint.node_id)
   )
   if (node === undefined) {
     return 'Other Endpoint'

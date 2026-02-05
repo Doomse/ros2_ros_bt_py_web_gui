@@ -31,7 +31,8 @@
 import * as uuid from 'uuid'
 import { useEditorStore } from '@/stores/editor'
 import type { TreeStructure, UUIDString } from '@/types/types'
-import { findNode, rosToUuid } from '@/utils'
+import { rosToUuid } from '@/utils'
+import { findNodeInTreeList, findTree, getNodeStructures } from '@/tree_selection'
 import { computed, ref } from 'vue'
 
 const editor_store = useEditorStore()
@@ -47,7 +48,7 @@ const emit = defineEmits<{
 const show_subtrees = ref<boolean>(true)
 
 const current_tree = computed<TreeStructure | undefined>(() => {
-  return editor_store.findTree(props.tree_id)
+  return findTree(editor_store.tree_structure_list, props.tree_id)
 })
 
 const subtree_ids = computed<Set<UUIDString>>(() => {
@@ -74,11 +75,11 @@ const node_name = computed<string>(() => {
   if (props.tree_id === uuid.NIL) {
     return 'Main Tree'
   }
-  const outer_tree = editor_store.findTreeContainingNode(props.tree_id)
-  if (outer_tree === undefined) {
-    return 'UNKNOWN'
-  }
-  const node = findNode(outer_tree, props.tree_id)
+  const node = findNodeInTreeList(
+    editor_store.tree_structure_list,
+    getNodeStructures,
+    props.tree_id
+  )
   if (node === undefined) {
     return 'UNKNOWN'
   }
@@ -96,7 +97,7 @@ function selectTree() {
     <div class="btn-group w-100">
       <button
         class="btn btn-outline-contrast text-start w-100"
-        :class="{ active: tree_id === rosToUuid(editor_store.current_tree.structure!.tree_id) }"
+        :class="{ active: tree_id === editor_store.selected_tree }"
         @click="selectTree"
       >
         <FontAwesomeIcon icon="fa-solid fa-share-nodes" class="me-1" />
