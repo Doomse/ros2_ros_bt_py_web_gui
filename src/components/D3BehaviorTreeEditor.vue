@@ -42,7 +42,7 @@ import {
 import { IOKind } from '@/types/types'
 import { notify } from '@kyvg/vue3-notification'
 import * as d3 from 'd3'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, computed, ref, watch } from 'vue'
 import type { FlextreeNode } from 'd3-flextree'
 import { drawDataLine } from '@/tree_display/draw_tree_data'
 import {
@@ -83,7 +83,30 @@ const tree_root_ref = ref<SVGGElement>()
 const draw_indicator_ref = ref<SVGPathElement>()
 const selection_rect_ref = ref<SVGRectElement>()
 
-let tree_display: D3TreeDisplay | undefined = undefined
+const tree_display = computed<D3TreeDisplay | undefined>((previous) => {
+  if (previous !== undefined) {
+    previous.clearTree()
+  }
+
+  if (tree_root_ref.value === undefined || draw_indicator_ref.value === undefined) {
+    console.warn('DOM is broken')
+    return
+  }
+
+  const root_element = d3.select(tree_root_ref.value)
+
+  // Dummy transition to fill constructor,
+  //   this is updated in the drawEverything callback
+  const tree_transition = d3.transition('tree-transition')
+
+  return new D3TreeDisplay(
+    editor_store.selected_tree,
+    !editor_store.has_selected_subtree,
+    draw_indicator_ref.value,
+    root_element,
+    tree_transition
+  )
+})
 
 let zoomObject: d3.ZoomBehavior<SVGSVGElement, unknown> | undefined = undefined
 
@@ -191,20 +214,23 @@ function dragPanTimerHandler() {
   d3.select(viewport_ref.value!).call(zoomObject!.translateBy, pan_direction[0], pan_direction[1])
 }
 
-watch([() => editor_store.tree_structure_list, () => editor_store.is_layer_mode], drawEverything, {
-  immediate: true
-})
+watch(
+  [tree_display, () => editor_store.tree_structure_list, () => editor_store.is_layer_mode],
+  drawEverything,
+  {
+    immediate: true
+  }
+)
 function drawEverything() {
-  if (
-    svg_g_ref.value === undefined ||
-    tree_root_ref.value === undefined ||
-    draw_indicator_ref.value === undefined
-  ) {
+  if (svg_g_ref.value === undefined) {
     console.warn('DOM is broken')
     return
   }
 
-  const root_element = d3.select(tree_root_ref.value)
+  if (tree_display.value === undefined) {
+    console.warn('Tree display unset')
+    return
+  }
 
   // Prepare transition config for synchronization, the typed select statement is necessary to give the transition appropriate typing
   const tree_transition = d3
@@ -213,15 +239,11 @@ function drawEverything() {
     .duration(100)
     .ease(d3.easeQuad)
 
-  tree_display = new D3TreeDisplay(
-    editor_store.selected_tree,
-    !editor_store.has_selected_subtree,
-    draw_indicator_ref.value,
-    root_element,
-    tree_transition
-  )
+  tree_display.value.updateTransition(tree_transition)
 
-  tree_display.drawTree()
+  tree_display.value.drawTree()
+
+  updateNodeState()
 }
 
 function getIcon(state: NodeStateValues | undefined) {
@@ -263,6 +285,7 @@ function updateNodeState() {
         node.data.state = node_state.state
       }
     })
+
   node
     .select<SVGRectElement>('.' + node_body_css_class)
     .style('stroke', (d) => {
@@ -291,12 +314,12 @@ function updateNodeState() {
       }
     })
   node
-    .select<SVGElement>('.' + node_state_css_class)
+    .select<SVGSVGElement>('.' + node_state_css_class)
     .attr('viewBox', (node) => {
       const icon = getIcon(node.data.state)
       return '0 0 ' + icon[0] + ' ' + icon[1]
     })
-    .attr('x', (node) => node.data.size.width - icon_width - 2 * node_padding)
+    .attr('x', (node) => node.data.offset.x + node.data.size.width - icon_width - node_padding)
     .attr('y', (node) => node.data.offset.y + node_padding)
     .select<SVGPathElement>('path')
     .attr('d', (node) => {
@@ -325,16 +348,16 @@ function toggleValidDropTargets() {
     .selectAll<SVGRectElement, DropTarget>('.' + drop_target_css_class)
     .attr('visibility', 'hidden')
 
-  if (tree_display === undefined) {
+  if (tree_display.value === undefined) {
     console.warn('Tree is not drawn')
     return
   }
 
   if (editor_store.dragging_existing_node !== undefined) {
-    tree_display.toggleExistingNodeDropTargets(editor_store.dragging_existing_node)
+    tree_display.value.toggleExistingNodeDropTargets(editor_store.dragging_existing_node)
   }
   if (editor_store.dragging_new_node !== undefined) {
-    tree_display.toggleNewNodeDropTargets(editor_store.dragging_new_node)
+    tree_display.value.toggleNewNodeDropTargets(editor_store.dragging_new_node)
   }
 }
 
@@ -360,12 +383,12 @@ function toggleDataEdgeTargets() {
     return
   }
 
-  if (tree_display === undefined) {
+  if (tree_display.value === undefined) {
     console.warn('Tree is not drawn')
     return
   }
 
-  tree_display.highlightCompatibleVertices(editor_store.data_edge_endpoint)
+  tree_display.value.highlightCompatibleDataVertices(editor_store.data_edge_endpoint)
 }
 
 watch(
@@ -447,7 +470,7 @@ onMounted(() => {
   const viewport = d3.select(viewport_ref.value)
 
   zoomObject = d3.zoom<SVGSVGElement, unknown>()
-  zoomObject.scaleExtent([0.3, 1.0])
+  zoomObject.scaleExtent([0.3, 3.0])
 
   const container = d3.select<SVGGElement, never>(svg_g_ref.value)
 

@@ -188,21 +188,20 @@ export class D3TreeDataDisplay {
   readonly draw_indicator: SVGPathElement
   readonly vertices_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly edges_element: d3.Selection<SVGGElement, unknown, null, undefined>
-  readonly tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>
+
+  tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined> | undefined
 
   constructor(
     tree_id: UUIDString,
     editable: boolean,
     draw_indicator: SVGPathElement,
-    root_element: d3.Selection<SVGGElement, unknown, null, undefined>,
-    tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>
+    root_element: d3.Selection<SVGGElement, unknown, null, undefined>
   ) {
     this.tree_id = tree_id
     this.editable = editable
     this.draw_indicator = draw_indicator
     this.edges_element = root_element.append('g')
     this.vertices_element = root_element.append('g')
-    this.tree_transition = tree_transition
   }
 
   private prepareTreeData(tree_layout: FlextreeNode<BTEditorNode>): DataEdgeTerminal[] {
@@ -286,8 +285,13 @@ export class D3TreeDataDisplay {
         })
     }
 
-    data_vertices
-      .transition(this.tree_transition)
+    let vertex_transition
+    if (this.tree_transition === undefined) {
+      vertex_transition = data_vertices
+    } else {
+      vertex_transition = data_vertices.transition(this.tree_transition)
+    }
+    vertex_transition
       //NOTE group elements can't be positioned with x= and y=
       .attr('transform', (d) => 'translate(' + d.x + ', ' + d.y + ')')
   }
@@ -347,7 +351,7 @@ export class D3TreeDataDisplay {
       }
     })
 
-    this.edges_element
+    const edge_selection = this.edges_element
       .selectChildren<SVGPathElement, DataEdge>('.' + data_edge_css_class)
       .data(
         data_edges,
@@ -402,8 +406,13 @@ export class D3TreeDataDisplay {
           .dispatch('mouseout')
         d3.select(this).classed(data_graph_hover_css_class, false).attr('id', null)
       })
-      .transition(this.tree_transition)
-      .attr('d', (edge: DataEdge) => drawDataLine(edge.source, edge.target))
+    let edge_transition
+    if (this.tree_transition === undefined) {
+      edge_transition = edge_selection
+    } else {
+      edge_transition = edge_selection.transition(this.tree_transition)
+    }
+    edge_transition.attr('d', (edge: DataEdge) => drawDataLine(edge.source, edge.target))
   }
 
   public drawTreeData(tree_layout: FlextreeNode<BTEditorNode>) {
