@@ -188,18 +188,15 @@ export class D3DropTargetDisplay {
   readonly tree_id: UUIDString
   readonly editable: boolean
   readonly targets_element: d3.Selection<SVGGElement, unknown, null, undefined>
-  readonly tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>
 
   constructor(
     tree_id: UUIDString,
     editable: boolean,
-    root_element: d3.Selection<SVGGElement, unknown, null, undefined>,
-    tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>
+    root_element: d3.Selection<SVGGElement, unknown, null, undefined>
   ) {
     this.tree_id = tree_id
     this.editable = editable
     this.targets_element = root_element.append('g')
-    this.tree_transition = tree_transition
   }
 
   private prepareTargetData(tree_layout: FlextreeNode<BTEditorNode>): DropTarget[] {

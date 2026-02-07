@@ -58,9 +58,10 @@ import {
   io_gripper_size,
   io_gripper_spacing,
   node_spacing,
-  tree_edge_css_class
+  tree_edge_css_class,
+  node_inner_css_class
 } from './draw_tree_config'
-import { findTree } from '../tree_selection'
+import { findTree, findTreeContainingNode, getNodeStructures } from '../tree_selection'
 import { D3TreeDataDisplay } from './draw_tree_data'
 import { D3DropTargetDisplay } from './draw_drop_targets'
 
@@ -74,9 +75,6 @@ function drawNewNodes(
   const group = selection
     .append<SVGGElement>('g')
     .classed(tree_node_css_class, true)
-    // The two css-classes below are currently unused
-    .classed('node--internal', (d) => d.children !== undefined && d.children.length > 0)
-    .classed('node--leaf', (d) => d.children === undefined || d.children.length == 0)
     .on('click.select', (event, node: d3.HierarchyNode<BTEditorNode>) => {
       if (event.shiftKey) {
         edit_node_store.selectMultipleNodes([node.data.node_id])
@@ -99,9 +97,77 @@ function drawNewNodes(
     .attr('height', icon_width)
     .append('path')
 
+  group.append<SVGGElement>('g').classed(node_inner_css_class, true)
+
   // The join pattern requires a return of the appended elements
   // For consistency the node body is filled using the update method
   return group
+}
+
+function resetNodeBody(
+  selection: d3.Selection<SVGGElement, d3.HierarchyNode<BTEditorNode>, SVGGElement, unknown>
+) {
+  // Reset width and height of background rect
+  selection
+    .select<SVGRectElement>('.' + node_body_css_class)
+    .attr('x', null)
+    .attr('y', null)
+    .attr('width', null)
+    .attr('height', null)
+
+  selection
+    .select<SVGTextElement>('.' + node_name_css_class)
+    .selectChildren<SVGTSpanElement, never>('tspan')
+    .remove()
+
+  selection
+    .select<SVGTextElement>('.' + node_class_css_class)
+    .selectChildren<SVGTSpanElement, never>('tspan')
+    .remove()
+
+  selection
+    .select<SVGSVGElement>('.' + node_state_css_class)
+    .attr('x', 0)
+    .attr('y', 0)
+}
+
+function drawSubtrees(
+  outer_tree_display: D3TreeDisplay,
+  selection: d3.Selection<SVGGElement, d3.HierarchyNode<BTEditorNode>, SVGGElement, unknown>
+) {
+  const editor_store = useEditorStore()
+
+  const old_subtree_nodes = new Set(outer_tree_display.nested_subtrees.keys())
+
+  const new_subtree_nodes = new Set(editor_store.tree_structure_list.map((tree) => tree.tree_id))
+
+  old_subtree_nodes.difference(new_subtree_nodes).forEach((key) => {
+    outer_tree_display.nested_subtrees.get(key)!.clearTree()
+    outer_tree_display.nested_subtrees.delete(key)
+  })
+
+  selection
+    .filter((node) => new_subtree_nodes.difference(old_subtree_nodes).has(node.data.node_id))
+    .each(function (node) {
+      const nested_tree_display = new D3TreeDisplay(
+        node.data.node_id,
+        false,
+        outer_tree_display.draw_indicator,
+        d3.select(this).selectChild('.' + node_inner_css_class)!
+      )
+      outer_tree_display.nested_subtrees.set(node.data.node_id, nested_tree_display)
+    })
+
+  outer_tree_display.nested_subtrees.values().forEach((display) => display.drawTree())
+
+  selection
+    .filter((node) => new_subtree_nodes.has(node.data.node_id))
+    .selectChild<SVGGElement>('.' + node_inner_css_class)
+    .attr('transform', function () {
+      const rect = this.getBBox()
+      // Downscale and center subtree
+      return `translate(${rect.width / 2 / 2 + node_padding},10) scale(0.5)`
+    })
 }
 
 function layoutText(element: SVGGElement, data: d3.HierarchyNode<BTEditorNode>): number {
@@ -115,10 +181,6 @@ function layoutText(element: SVGGElement, data: d3.HierarchyNode<BTEditorNode>):
 
   const node_name = data.data.name
   const node_class = data.data.node_class
-
-  name_elem.selectChildren<SVGTSpanElement, never>('tspan').remove()
-
-  class_elem.selectChildren<SVGTSpanElement, never>('tspan').remove()
 
   let title_lines: number = 0
 
@@ -213,14 +275,6 @@ function updateNodeBody(
     node.data.size.width = layoutText(this, node)
   })
 
-  // Reset width and height of background rect
-  selection
-    .select<SVGRectElement>('.' + node_body_css_class)
-    .attr('x', null)
-    .attr('y', null)
-    .attr('width', null)
-    .attr('height', null)
-
   // Get width and height from text content
   selection.each(function (d) {
     const inputs = d.data.inputs || []
@@ -232,7 +286,7 @@ function updateNodeBody(
     d.data.offset.x = rect.x - node_padding
     d.data.offset.y = rect.y - 0.5 * node_padding
     // Width has already been set by text layout function
-    d.data.size.width += 2 * node_padding
+    d.data.size.width = Math.max(d.data.size.width, rect.width) + 2 * node_padding
     d.data.size.height = Math.max(rect.height + 1.5 * node_padding, min_height)
   })
 
@@ -242,51 +296,43 @@ function updateNodeBody(
     .attr('y', (d) => d.data.offset.y)
     .attr('width', (d) => d.data.size.width)
     .attr('height', (d) => d.data.size.height)
-
-  return selection
 }
 
 export class D3TreeDisplay {
+  nested_subtrees: Map<UUIDString, D3TreeDisplay> = new Map()
+
   readonly tree_id: UUIDString
   readonly editable: boolean
   readonly draw_indicator: SVGPathElement
   readonly drop_target_display: D3DropTargetDisplay
   readonly data_display: D3TreeDataDisplay
+  readonly root_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly vertices_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly edges_element: d3.Selection<SVGGElement, unknown, null, undefined>
-  readonly tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>
+
+  tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined> | undefined
 
   constructor(
     tree_id: UUIDString,
     editable: boolean,
     draw_indicator: SVGPathElement,
-    root_element: d3.Selection<SVGGElement, unknown, null, undefined>,
-    tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>
+    root_element: d3.Selection<SVGGElement, unknown, null, undefined>
   ) {
-    // Clear the root_element first and foremost
-    root_element.selectChildren().remove()
-
     this.tree_id = tree_id
     this.editable = editable
     this.draw_indicator = draw_indicator
+    this.root_element = root_element
     this.edges_element = root_element.append('g')
     this.vertices_element = root_element.append('g')
-    this.tree_transition = tree_transition
 
-    this.drop_target_display = new D3DropTargetDisplay(
-      this.tree_id,
-      this.editable,
-      root_element,
-      this.tree_transition
-    )
+    this.drop_target_display = new D3DropTargetDisplay(this.tree_id, this.editable, root_element)
 
     const data_graph_element = root_element.append('g')
     this.data_display = new D3TreeDataDisplay(
       this.tree_id,
       this.editable,
       this.draw_indicator,
-      data_graph_element,
-      this.tree_transition
+      data_graph_element
     )
   }
 
@@ -433,17 +479,21 @@ export class D3TreeDisplay {
     // Potentially an issue with the typing library
 
     // Bind the new data to get a selection with all flextree properties
-    selection
-      .data(
-        tree_layout.descendants().filter((node) => node.data.node_id !== uuid.NIL),
-        (node) => node.id!
-      )
-      .transition(this.tree_transition)
-      .attr('transform', (d: FlextreeNode<BTEditorNode>) => {
-        const x = d.x - d.data.size.width / 2.0
-        const y = d.y
-        return 'translate(' + x + ', ' + y + ')'
-      })
+    const new_selection = selection.data<FlextreeNode<BTEditorNode>>(
+      tree_layout.descendants().filter((node) => node.data.node_id !== uuid.NIL),
+      (node) => node.id!
+    )
+    let transition
+    if (this.tree_transition === undefined) {
+      transition = new_selection
+    } else {
+      transition = new_selection.transition(this.tree_transition)
+    }
+    transition.attr('transform', (d: FlextreeNode<BTEditorNode>) => {
+      const x = d.x - d.data.size.width / 2.0
+      const y = d.y
+      return 'translate(' + x + ', ' + y + ')'
+    })
 
     return tree_layout
   }
@@ -458,6 +508,8 @@ export class D3TreeDisplay {
         (node) => node.id!
       ) // Join performs enter, update and exit at once
       .join(drawNewNodes)
+      .call(resetNodeBody)
+      .call((selection) => drawSubtrees(this, selection))
       .call(updateNodeBody)
 
     // No tree modifying if displaying a subtree
@@ -471,11 +523,19 @@ export class D3TreeDisplay {
     // Since we want to return the tree, we can't use the .call() syntax here
     const tree_layout = this.layoutTree(node, tree)
 
+    node
+      .filter((node) => node.data.name === 'Subtree')
+      .each(function (node) {
+        console.log(this)
+        console.log(this.getBBox())
+        console.log(node.data.size)
+      })
+
     return tree_layout
   }
 
   private drawTreeEdges(tree_layout: FlextreeNode<BTEditorNode>) {
-    this.edges_element
+    const edge_selection = this.edges_element
       .selectChildren<SVGPathElement, d3.HierarchyLink<BTEditorNode>>('.' + tree_edge_css_class)
       .data(
         tree_layout
@@ -485,23 +545,28 @@ export class D3TreeDisplay {
       )
       .join('path')
       .classed(tree_edge_css_class, true) // Redundant for update elements, preserves readability
-      .transition(this.tree_transition)
-      .attr(
-        'd',
-        d3
-          .linkVertical<SVGPathElement, HierarchyLink<BTEditorNode>, [number, number]>()
-          .source((link: HierarchyLink<BTEditorNode>) => {
-            const source = link.source as FlextreeNode<BTEditorNode>
-            return [
-              source.x + source.data.offset.x,
-              source.y + source.data.offset.y + source.data.size.height
-            ]
-          })
-          .target((link: HierarchyLink<BTEditorNode>) => {
-            const target = link.target as FlextreeNode<BTEditorNode>
-            return [target.x + target.data.offset.x, target.y + target.data.offset.y]
-          })
-      )
+    let edge_transition
+    if (this.tree_transition === undefined) {
+      edge_transition = edge_selection
+    } else {
+      edge_transition = edge_selection.transition(this.tree_transition)
+    }
+    edge_transition.attr(
+      'd',
+      d3
+        .linkVertical<SVGPathElement, HierarchyLink<BTEditorNode>, [number, number]>()
+        .source((link: HierarchyLink<BTEditorNode>) => {
+          const source = link.source as FlextreeNode<BTEditorNode>
+          return [
+            source.x + source.data.offset.x,
+            source.y + source.data.offset.y + source.data.size.height
+          ]
+        })
+        .target((link: HierarchyLink<BTEditorNode>) => {
+          const target = link.target as FlextreeNode<BTEditorNode>
+          return [target.x + target.data.offset.x, target.y + target.data.offset.y]
+        })
+    )
   }
 
   public drawTree() {
@@ -520,15 +585,64 @@ export class D3TreeDisplay {
     this.drop_target_display.drawDropTargets(tree_layout)
   }
 
+  public updateTransition(tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>) {
+    this.tree_transition = tree_transition
+    this.data_display.tree_transition = tree_transition
+    // Transitions aren't passed to nested trees, since they cause timing issues
+  }
+
+  public clearTree() {
+    this.root_element.selectChildren().remove()
+  }
+
   public toggleExistingNodeDropTargets(dragged_node: d3.HierarchyNode<BTEditorNode>) {
-    this.drop_target_display.toggleExistingNodeTargets(dragged_node)
+    const editor_store = useEditorStore()
+
+    const target_tree = findTreeContainingNode(
+      editor_store.tree_structure_list,
+      getNodeStructures,
+      dragged_node.data.node_id
+    )
+
+    if (target_tree === undefined) {
+      console.warn("Can't find tree of dragged node")
+      return
+    }
+
+    if (this.tree_id === target_tree.tree_id) {
+      this.drop_target_display.toggleExistingNodeTargets(dragged_node)
+    } else {
+      this.nested_subtrees
+        .values()
+        .forEach((value) => value.toggleExistingNodeDropTargets(dragged_node))
+    }
   }
 
   public toggleNewNodeDropTargets(dragged_node: DocumentedNode) {
     this.drop_target_display.toggleNewNodeTargets(dragged_node)
+    this.nested_subtrees.values().forEach((value) => value.toggleNewNodeDropTargets(dragged_node))
   }
 
-  public highlightCompatibleVertices(other_endpoint: DataEdgeTerminal) {
-    this.data_display.highlightCompatibleVertices(other_endpoint)
+  public highlightCompatibleDataVertices(other_endpoint: DataEdgeTerminal) {
+    const editor_store = useEditorStore()
+
+    const target_tree = findTreeContainingNode(
+      editor_store.tree_structure_list,
+      getNodeStructures,
+      other_endpoint.node.data.node_id
+    )
+
+    if (target_tree === undefined) {
+      console.warn("Can't find tree of dragged node")
+      return
+    }
+
+    if (this.tree_id === target_tree.tree_id) {
+      this.data_display.highlightCompatibleVertices(other_endpoint)
+    } else {
+      this.nested_subtrees
+        .values()
+        .forEach((value) => value.highlightCompatibleDataVertices(other_endpoint))
+    }
   }
 }
