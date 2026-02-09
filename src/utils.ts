@@ -48,6 +48,8 @@ import type {
   Wiring
 } from './types/types'
 import { IOKind } from './types/types'
+import { findNodeInTreeList, getNodeStructures } from './tree_selection'
+import { useEditorStore } from './stores/editor'
 
 export function parseRosTime(time: RosTime): Date {
   return new Date(time.sec * 1000 + time.nanosec / 1000000)
@@ -69,6 +71,21 @@ export function uuidToRos(str: UUIDString): UUIDMsg {
 
 export function compareRosUuid(u1: UUIDMsg, u2: UUIDMsg): boolean {
   return rosToUuid(u1) === rosToUuid(u2)
+}
+
+export function replaceNameIdParts(name_id_parts: string): string {
+  const editor_store = useEditorStore()
+  return name_id_parts
+    .split('.')
+    .map((name_id) => {
+      // If this is the id of a node, replace it with its name
+      const node = findNodeInTreeList(editor_store.tree_structure_list, getNodeStructures, name_id)
+      if (node === undefined) {
+        return name_id
+      }
+      return node.name
+    })
+    .join('.')
 }
 
 export function compareWirings(w1: Wiring, w2: Wiring): boolean {

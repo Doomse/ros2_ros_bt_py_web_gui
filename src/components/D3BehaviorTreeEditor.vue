@@ -95,16 +95,11 @@ const tree_display = computed<D3TreeDisplay | undefined>((previous) => {
 
   const root_element = d3.select(tree_root_ref.value)
 
-  // Dummy transition to fill constructor,
-  //   this is updated in the drawEverything callback
-  const tree_transition = d3.transition('tree-transition')
-
   return new D3TreeDisplay(
     editor_store.selected_tree,
     !editor_store.has_selected_subtree,
     draw_indicator_ref.value,
-    root_element,
-    tree_transition
+    root_element
   )
 })
 

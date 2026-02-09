@@ -50,6 +50,7 @@ export const drop_target_root_size: number = 150
 export const tree_node_css_class: string = 'node'
 export const node_body_css_class: string = 'btnode'
 export const node_inner_css_class: string = 'inner'
+export const node_warn_css_class: string = 'warn_msg'
 export const node_name_css_class: string = 'node_name'
 export const node_class_css_class: string = 'class_name'
 export const node_state_css_class: string = 'state_icon'

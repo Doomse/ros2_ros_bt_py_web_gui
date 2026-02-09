@@ -32,7 +32,7 @@ import { useEditNodeStore } from '@/stores/edit_node'
 import { useEditorStore } from '@/stores/editor'
 import { findNodeInTreeList, findTreeContainingNode, getNodeStructures } from '@/tree_selection'
 import type { TreeStructure, IOData, NodeDataLocation, Wiring } from '@/types/types'
-import { compareRosUuid, rosToUuid } from '@/utils'
+import { compareRosUuid, replaceNameIdParts, rosToUuid } from '@/utils'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -52,6 +52,13 @@ const param = computed<IOData | undefined>(() => {
     default:
       return undefined
   }
+})
+
+const display_key = computed<string>(() => {
+  if (param.value === undefined) {
+    return ''
+  }
+  return replaceNameIdParts(param.value.key)
 })
 
 const containing_tree = computed<TreeStructure | undefined>(() => {
@@ -111,7 +118,7 @@ function printOtherEndpoint(wiring: Wiring): string {
 <template>
   <div v-if="param !== undefined" class="list-group-item">
     <div class="h5">
-      {{ param.key + ' ' }}
+      {{ display_key }}&ensp;
       <span className="text-muted">(type: {{ param.type }})</span>
     </div>
     <div v-if="connected_edges" class="d-flex flex-wrap m-1">

@@ -39,7 +39,7 @@ import type {
   UUIDString
 } from '@/types/types'
 import { IOKind } from '@/types/types'
-import { prettyprint_type, typesCompatible } from '@/utils'
+import { prettyprint_type, replaceNameIdParts, typesCompatible } from '@/utils'
 import * as d3 from 'd3'
 import type { FlextreeNode } from 'd3-flextree'
 import * as uuid from 'uuid'
@@ -65,6 +65,25 @@ import {
 } from './draw_tree_config'
 import { findTree } from '../tree_selection'
 import { addDataEdge } from '@/tree_manipulation'
+
+// Calculates vertical offsets for data vertices based on a shared prefix
+//   also returns an extra offset at the end to give an indication of the total height.
+export function getDataVertOffsets(data_list: TrimmedNodeData[]): number[] {
+  let vertical_offset = io_gripper_spacing
+  let previous_prefix = ''
+  const offsets = data_list.map((data, index) => {
+    const key_prefix = data.key.split('.').slice(0, -1).join('.')
+    if (key_prefix !== previous_prefix && index > 0) {
+      vertical_offset += io_gripper_spacing
+    }
+    const old_vertical_offset = vertical_offset
+    vertical_offset += io_gripper_size + io_gripper_spacing
+    previous_prefix = key_prefix
+    return old_vertical_offset
+  })
+  offsets.push(vertical_offset)
+  return offsets
+}
 
 export function drawDataLine(source: DataEdgePoint, target: DataEdgePoint) {
   const lineGen = d3
@@ -156,7 +175,6 @@ function drawNewDataVert(
     .attr('dominant-baseline', 'middle')
     .attr('visibility', 'hidden')
     .attr('text-anchor', (d) => (d.kind === IOKind.INPUT ? 'end' : 'start'))
-    .text((d) => d.key)
     .attr('x', (d) => {
       switch (d.kind) {
         case IOKind.INPUT:
@@ -212,6 +230,7 @@ export class D3TreeDataDisplay {
         return
       }
 
+      const input_offsets = getDataVertOffsets(node.data.inputs)
       node.data.inputs.map((input: TrimmedNodeData, index: number) => {
         data_points.push({
           node: node,
@@ -220,13 +239,10 @@ export class D3TreeDataDisplay {
           key: input.key,
           type: input.serialized_type,
           x: node.x + node.data.offset.x - node.data.size.width * 0.5 - io_gripper_size,
-          y:
-            node.y +
-            node.data.offset.y +
-            io_gripper_spacing +
-            index * (io_gripper_size + io_gripper_spacing)
+          y: node.y + node.data.offset.y + input_offsets[index]
         })
       })
+      const output_offsets = getDataVertOffsets(node.data.outputs)
       node.data.outputs.map((output: TrimmedNodeData, index: number) => {
         data_points.push({
           node: node,
@@ -235,11 +251,7 @@ export class D3TreeDataDisplay {
           key: output.key,
           type: output.serialized_type,
           x: node.x + node.data.offset.x + node.data.size.width * 0.5,
-          y:
-            node.y +
-            node.data.offset.y +
-            io_gripper_spacing +
-            index * (io_gripper_size + io_gripper_spacing)
+          y: node.y + node.data.offset.y + output_offsets[index]
         })
       })
     })
@@ -255,9 +267,10 @@ export class D3TreeDataDisplay {
       .data(data_points, (d) => d.node.id! + '###' + d.kind + '###' + d.key)
       .join((enter) => drawNewDataVert(enter, this.draw_indicator))
 
-    // Since types of DataVerts can change, type values are added out here
+    // Since descriptions of DataVerts can change, they are added out here
     data_vertices
       .select('.' + data_vert_label_css_class)
+      .text((d) => replaceNameIdParts(d.key))
       .select('.' + data_vert_label_type_css_class)
       .text((d) => '(type: ' + prettyprint_type(d.type) + ')')
 

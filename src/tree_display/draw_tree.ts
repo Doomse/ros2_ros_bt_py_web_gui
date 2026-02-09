@@ -41,7 +41,7 @@ import * as d3 from 'd3'
 import type { HierarchyNode, HierarchyLink } from 'd3-hierarchy'
 import { flextree, type FlextreeNode } from 'd3-flextree'
 import * as uuid from 'uuid'
-import { rosToUuid } from '@/utils'
+import { replaceNameIdParts, rosToUuid } from '@/utils'
 import {
   tree_node_css_class,
   node_body_css_class,
@@ -55,14 +55,13 @@ import {
   node_padding,
   node_class_height,
   class_line_length,
-  io_gripper_size,
-  io_gripper_spacing,
   node_spacing,
   tree_edge_css_class,
-  node_inner_css_class
+  node_inner_css_class,
+  node_warn_css_class
 } from './draw_tree_config'
 import { findTree, findTreeContainingNode, getNodeStructures } from '../tree_selection'
-import { D3TreeDataDisplay } from './draw_tree_data'
+import { D3TreeDataDisplay, getDataVertOffsets } from './draw_tree_data'
 import { D3DropTargetDisplay } from './draw_drop_targets'
 
 const line_wrap_regex: RegExp = /[a-z0-9][A-Z]|[_\- ][a-zA-Z]/dg
@@ -101,6 +100,8 @@ function drawNewNodes(
     .append('path')
 
   group.append<SVGGElement>('g').classed(node_inner_css_class, true)
+
+  group.append<SVGTextElement>('text').classed(node_warn_css_class, true)
 
   // The join pattern requires a return of the appended elements
   // For consistency the node body is filled using the update method
@@ -173,7 +174,11 @@ function drawSubtrees(
     })
 }
 
-function layoutText(element: SVGGElement, data: d3.HierarchyNode<BTEditorNode>): number {
+function layoutText(
+  element: SVGGElement,
+  data: d3.HierarchyNode<BTEditorNode>,
+  offset: number
+): number {
   // Track width of longest line and return that for box sizing
   let max_width: number = 0
 
@@ -186,6 +191,8 @@ function layoutText(element: SVGGElement, data: d3.HierarchyNode<BTEditorNode>):
   const node_class = data.data.node_class
 
   let title_lines: number = 0
+
+  name_elem.attr('y', offset)
 
   // Find positions for potential line breaks
   let wrap_indices: number[] = [0]
@@ -232,7 +239,7 @@ function layoutText(element: SVGGElement, data: d3.HierarchyNode<BTEditorNode>):
     title_lines += 1
   }
 
-  class_elem.attr('y', title_lines * node_name_height)
+  class_elem.attr('y', title_lines * node_name_height + offset)
 
   // Find positions for potential line breaks
   wrap_indices = [0]
@@ -275,22 +282,32 @@ function updateNodeBody(
   selection: d3.Selection<SVGGElement, d3.HierarchyNode<BTEditorNode>, SVGGElement, never>
 ) {
   selection.each(function (node) {
-    node.data.size.width = layoutText(this, node)
+    const input_set = new Set(node.data.inputs.map((d) => replaceNameIdParts(d.key)))
+    const output_set = new Set(node.data.outputs.map((d) => replaceNameIdParts(d.key)))
+    const has_duplicates =
+      input_set.size < node.data.inputs.length && output_set.size < node.data.outputs.length
+
+    d3.select(this)
+      .selectChild('.' + node_warn_css_class)
+      .text(has_duplicates ? 'Has duplicate IO names' : '')
+
+    // Offset based on height of warning text
+    node.data.size.width = layoutText(this, node, has_duplicates ? 36 : 0)
   })
 
   // Get width and height from text content
-  selection.each(function (d) {
-    const inputs = d.data.inputs || []
-    const outputs = d.data.outputs || []
-    const max_num_grippers = Math.max(inputs.length, outputs.length)
-    const min_height =
-      io_gripper_size * max_num_grippers + io_gripper_spacing * (max_num_grippers + 1)
+  selection.each(function (node) {
+    const min_height = Math.max(
+      getDataVertOffsets(node.data.inputs).at(-1)!,
+      getDataVertOffsets(node.data.outputs).at(-1)!
+    )
+
     const rect = this.getBBox()
-    d.data.offset.x = rect.x - node_padding
-    d.data.offset.y = rect.y - 0.5 * node_padding
+    node.data.offset.x = rect.x - node_padding
+    node.data.offset.y = rect.y - 0.5 * node_padding
     // Width has already been set by text layout function
-    d.data.size.width = Math.max(d.data.size.width, rect.width) + 2 * node_padding
-    d.data.size.height = Math.max(rect.height + 1.5 * node_padding, min_height)
+    node.data.size.width = Math.max(node.data.size.width, rect.width) + 2 * node_padding
+    node.data.size.height = Math.max(rect.height + 1.5 * node_padding, min_height)
   })
 
   selection
