@@ -338,10 +338,6 @@ export class D3DropTargetDisplay {
           }) === undefined
         )
       })
-      .attr('visibility', 'visible')
-
-    // If the filter returns true (keeps the node) it gets hidden
-    targets
       .filter((drop_target: DropTarget) => {
         switch (drop_target.position) {
           case Position.CENTER:

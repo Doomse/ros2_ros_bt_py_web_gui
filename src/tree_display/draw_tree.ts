@@ -76,6 +76,9 @@ function drawNewNodes(
     .append<SVGGElement>('g')
     .classed(tree_node_css_class, true)
     .on('click.select', (event, node: d3.HierarchyNode<BTEditorNode>) => {
+      if (event.ctrlKey) {
+        return // Do nothing if ctrl is pressed
+      }
       if (event.shiftKey) {
         edit_node_store.selectMultipleNodes([node.data.node_id])
       } else {
@@ -296,6 +299,14 @@ function updateNodeBody(
     .attr('y', (d) => d.data.offset.y)
     .attr('width', (d) => d.data.size.width)
     .attr('height', (d) => d.data.size.height)
+
+  selection
+    .select<SVGTextElement>('.' + node_name_css_class)
+    .attr('dx', (d) => d.data.offset.x + node_padding)
+
+  selection
+    .select<SVGTextElement>('.' + node_class_css_class)
+    .attr('dx', (d) => d.data.offset.x + node_padding)
 }
 
 export class D3TreeDisplay {
@@ -515,6 +526,9 @@ export class D3TreeDisplay {
     // No tree modifying if displaying a subtree
     if (this.editable) {
       node.on('mousedown.dragdrop', (event, node: d3.HierarchyNode<BTEditorNode>) => {
+        if (event.ctrlKey) {
+          return // Do nothing if ctrl is pressed
+        }
         editor_store.startDraggingExistingNode(node)
         event.stopPropagation()
       })
@@ -522,14 +536,6 @@ export class D3TreeDisplay {
 
     // Since we want to return the tree, we can't use the .call() syntax here
     const tree_layout = this.layoutTree(node, tree)
-
-    node
-      .filter((node) => node.data.name === 'Subtree')
-      .each(function (node) {
-        console.log(this)
-        console.log(this.getBBox())
-        console.log(node.data.size)
-      })
 
     return tree_layout
   }

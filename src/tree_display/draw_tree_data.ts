@@ -264,6 +264,9 @@ export class D3TreeDataDisplay {
     if (this.editable) {
       data_vertices
         .on('mousedown.drawedge', (ev, term: DataEdgeTerminal) => {
+          if (ev.ctrlKey) {
+            return // Do nothing if ctrl is pressed
+          }
           editor_store.startDrawingDataEdge(term)
         })
         .on('mouseup.drawedge', (ev, term: DataEdgeTerminal) => {
@@ -371,6 +374,9 @@ export class D3TreeDataDisplay {
       .join('path')
       .classed(data_edge_css_class, true)
       .on('click.select', (event, edge: DataEdge) => {
+        if (event.ctrlKey) {
+          return // Do nothing if ctrl is pressed
+        }
         editor_store.selectEdge(edge.wiring)
         event.stopPropagation()
       })
