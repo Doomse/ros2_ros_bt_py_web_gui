@@ -59,6 +59,7 @@ export const drop_target_css_class: string = 'drop_target'
 export const data_vert_group_css_class: string = 'gripper-group'
 export const data_vert_grip_css_class: string = 'gripper'
 export const data_vert_label_css_class: string = 'label'
+export const data_vert_label_name_css_class: string = 'label-name'
 export const data_vert_label_type_css_class: string = 'label-type'
 export const data_edge_css_class: string = 'data-link'
 

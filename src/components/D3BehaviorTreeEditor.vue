@@ -69,7 +69,8 @@ import {
   tree_node_css_class,
   node_state_css_class,
   icon_width,
-  node_padding
+  node_padding,
+  data_graph_hover_css_class
 } from '@/tree_display/draw_tree_config'
 import { D3TreeDisplay } from '@/tree_display/draw_tree'
 import { findNodeInTreeList, getNodeStates } from '@/tree_selection'
@@ -82,6 +83,9 @@ const svg_g_ref = ref<SVGGElement>()
 const tree_root_ref = ref<SVGGElement>()
 const draw_indicator_ref = ref<SVGPathElement>()
 const selection_rect_ref = ref<SVGRectElement>()
+const highlight_v1_ref = ref<SVGUseElement>()
+const highlight_v2_ref = ref<SVGUseElement>()
+const highlight_e_ref = ref<SVGUseElement>()
 
 const tree_display = computed<D3TreeDisplay | undefined>((previous) => {
   if (previous !== undefined) {
@@ -99,6 +103,7 @@ const tree_display = computed<D3TreeDisplay | undefined>((previous) => {
     editor_store.selected_tree,
     !editor_store.has_selected_subtree,
     draw_indicator_ref.value,
+    highlightElem,
     root_element
   )
 })
@@ -453,6 +458,48 @@ function colorSelectedEdge() {
   }
 }
 
+function highlightElem(elem: SVGGraphicsElement, target: 'v1' | 'v2' | 'e', onoff: boolean) {
+  if (
+    highlight_v1_ref.value === undefined ||
+    highlight_v2_ref.value === undefined ||
+    highlight_e_ref.value === undefined
+  ) {
+    console.warn('DOM is broken')
+    return
+  }
+
+  let css_id: string
+  let highlight: SVGUseElement
+
+  switch (target) {
+    case 'v1':
+      css_id = data_vert1_highlight_css_id
+      highlight = highlight_v1_ref.value
+      break
+    case 'v2':
+      css_id = data_vert2_highlight_css_id
+      highlight = highlight_v2_ref.value
+      break
+    case 'e':
+      css_id = data_edge_highlight_css_id
+      highlight = highlight_e_ref.value
+      break
+  }
+
+  d3.select(elem)
+    .classed(data_graph_hover_css_class, onoff)
+    .attr('id', onoff ? css_id : null)
+
+  if (onoff) {
+    let matrix = tree_root_ref.value!.getCTM()!.inverse().multiply(elem.getCTM()!)
+    if (target === 'v1' || target === 'v2') {
+      matrix = matrix.multiply(elem.transform.baseVal.getItem(0)!.matrix.inverse())
+    }
+    const transform = highlight.transform.baseVal.createSVGTransformFromMatrix(matrix)
+    highlight.transform.baseVal.initialize(transform)
+  }
+}
+
 onMounted(() => {
   if (viewport_ref.value === undefined || svg_g_ref.value === undefined) {
     notify({
@@ -623,9 +670,9 @@ onMounted(() => {
       <g ref="tree_root_ref" />
 
       <!--Below is used to pull elements to the foreground on hover-->
-      <use :href="'#' + data_vert1_highlight_css_id" pointer-events="none" />
-      <use :href="'#' + data_vert2_highlight_css_id" pointer-events="none" />
-      <use :href="'#' + data_edge_highlight_css_id" pointer-events="none" />
+      <use ref="highlight_v1_ref" :href="'#' + data_vert1_highlight_css_id" pointer-events="none" />
+      <use ref="highlight_v2_ref" :href="'#' + data_vert2_highlight_css_id" pointer-events="none" />
+      <use ref="highlight_e_ref" :href="'#' + data_edge_highlight_css_id" pointer-events="none" />
 
       <path ref="draw_indicator_ref" class="drawing-indicator" />
       <rect ref="selection_rect_ref" class="selection" />

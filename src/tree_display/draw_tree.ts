@@ -157,6 +157,7 @@ function drawSubtrees(
         node.data.node_id,
         false,
         outer_tree_display.draw_indicator,
+        outer_tree_display.highlightElemCB,
         d3.select(this).selectChild('.' + node_inner_css_class)!
       )
       outer_tree_display.nested_subtrees.set(node.data.node_id, nested_tree_display)
@@ -338,17 +339,21 @@ export class D3TreeDisplay {
   readonly vertices_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly edges_element: d3.Selection<SVGGElement, unknown, null, undefined>
 
+  readonly highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void
+
   tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined> | undefined
 
   constructor(
     tree_id: UUIDString,
     editable: boolean,
     draw_indicator: SVGPathElement,
+    highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void,
     root_element: d3.Selection<SVGGElement, unknown, null, undefined>
   ) {
     this.tree_id = tree_id
     this.editable = editable
     this.draw_indicator = draw_indicator
+    this.highlightElemCB = highlightElemCB
     this.root_element = root_element
     this.edges_element = root_element.append('g')
     this.vertices_element = root_element.append('g')
@@ -360,6 +365,7 @@ export class D3TreeDisplay {
       this.tree_id,
       this.editable,
       this.draw_indicator,
+      this.highlightElemCB,
       data_graph_element
     )
   }

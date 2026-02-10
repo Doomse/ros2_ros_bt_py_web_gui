@@ -82,8 +82,12 @@ rect.selection {
 
 .link {
   fill: none;
-  stroke: #1e2226;
+  stroke: #aaadaf;
   stroke-width: 3.5px;
+}
+
+.lightmode .link {
+  stroke: #1e2226;
 }
 
 .btnode {

@@ -52,16 +52,14 @@ import {
   io_gripper_spacing,
   data_graph_comaptible_css_class,
   data_graph_hover_css_class,
-  data_vert1_highlight_css_id,
   data_vert_grip_css_class,
   data_edge_css_class,
-  data_vert2_highlight_css_id,
-  data_edge_highlight_css_id,
   io_edge_bump_thresh,
   io_edge_bump_factor,
   io_edge_offset,
   io_edge_curve_factor,
-  io_edge_curve_offset
+  io_edge_curve_offset,
+  data_vert_label_name_css_class
 } from './draw_tree_config'
 import { findTree } from '../tree_selection'
 import { addDataEdge } from '@/tree_manipulation'
@@ -128,15 +126,16 @@ export function drawDataLine(source: DataEdgePoint, target: DataEdgePoint) {
 }
 
 function drawNewDataVert(
-  selection: d3.Selection<d3.EnterElement, DataEdgeTerminal, SVGGElement, unknown>,
-  draw_indicator: SVGPathElement
+  draw_indicator: SVGPathElement,
+  highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void,
+  selection: d3.Selection<d3.EnterElement, DataEdgeTerminal, SVGGElement, unknown>
 ) {
   const editor_store = useEditorStore()
 
   const groups = selection
     .append('g')
     .classed(data_vert_group_css_class, true)
-    .on('mouseover.highlight', function () {
+    .on('mouseover.highlight', function (ev, term) {
       if (editor_store.is_dragging) {
         // Highlight compatible vertices when dragging
         const compat = d3.select(this).classed(data_graph_comaptible_css_class)
@@ -144,22 +143,20 @@ function drawNewDataVert(
         d3.select(draw_indicator).classed(data_graph_hover_css_class, compat)
       } else {
         d3.select(this)
-          .classed(data_graph_hover_css_class, true)
-          .attr('id', data_vert1_highlight_css_id)
           .select('.' + data_vert_label_css_class)
           .attr('visibility', 'visible')
+        highlightElemCB(this, term.kind === IOKind.INPUT ? 'v2' : 'v1', true)
       }
     })
-    .on('mouseout.highlight', function () {
+    .on('mouseout.highlight', function (ev, term) {
       if (editor_store.is_dragging) {
         d3.select(this).classed(data_graph_hover_css_class, false)
         d3.select(draw_indicator).classed(data_graph_hover_css_class, false)
       } else {
         d3.select(this)
-          .classed(data_graph_hover_css_class, false)
-          .attr('id', null)
           .select('.' + data_vert_label_css_class)
           .attr('visibility', 'hidden')
+        highlightElemCB(this, term.kind === IOKind.INPUT ? 'v2' : 'v1', false)
       }
     })
 
@@ -188,6 +185,8 @@ function drawNewDataVert(
     })
     .attr('y', 0.5 * io_gripper_size)
 
+  labels.append('tspan').classed(data_vert_label_name_css_class, true)
+
   labels
     .append('tspan')
     .classed(data_vert_label_type_css_class, true)
@@ -200,12 +199,60 @@ function drawNewDataVert(
   return groups
 }
 
+function drawNewDataEdge(
+  data_vertices: d3.Selection<SVGGElement, DataEdgeTerminal, SVGGElement, unknown>,
+  highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void,
+  selection: d3.Selection<d3.EnterElement, DataEdge, SVGGElement, unknown>
+) {
+  const editor_store = useEditorStore()
+
+  return selection
+    .append('path')
+    .classed(data_edge_css_class, true)
+    .on('click.select', (event, edge: DataEdge) => {
+      if (event.ctrlKey) {
+        return // Do nothing if ctrl is pressed
+      }
+      editor_store.selectEdge(edge.wiring)
+      event.stopPropagation()
+    })
+    .on('mouseover.highlight', function (ev, edge: DataEdge) {
+      if (editor_store.is_dragging) {
+        return // No highlights while dragging
+      }
+      data_vertices
+        .filter((term: DataEdgeTerminal) => term === edge.source || term === edge.target)
+        .dispatch('mouseover')
+        //Hide target label
+        .select('.' + data_vert_label_css_class)
+        .attr('visibility', (term: DataEdgeTerminal) => {
+          if (term.kind === IOKind.INPUT) {
+            return 'hidden'
+          }
+          return 'visible'
+        })
+
+      highlightElemCB(this, 'e', true)
+    })
+    .on('mouseout.highlight', function (ev, edge: DataEdge) {
+      if (editor_store.is_dragging) {
+        return // No highlights while dragging
+      }
+      data_vertices
+        .filter((term: DataEdgeTerminal) => term === edge.source || term === edge.target)
+        .dispatch('mouseout')
+
+      highlightElemCB(this, 'e', false)
+    })
+}
+
 export class D3TreeDataDisplay {
   readonly tree_id: UUIDString
   readonly editable: boolean
   readonly draw_indicator: SVGPathElement
   readonly vertices_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly edges_element: d3.Selection<SVGGElement, unknown, null, undefined>
+  readonly highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void
 
   tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined> | undefined
 
@@ -213,16 +260,18 @@ export class D3TreeDataDisplay {
     tree_id: UUIDString,
     editable: boolean,
     draw_indicator: SVGPathElement,
+    highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void,
     root_element: d3.Selection<SVGGElement, unknown, null, undefined>
   ) {
     this.tree_id = tree_id
     this.editable = editable
     this.draw_indicator = draw_indicator
+    this.highlightElemCB = highlightElemCB
     this.edges_element = root_element.append('g')
     this.vertices_element = root_element.append('g')
   }
 
-  private prepareTreeData(tree_layout: FlextreeNode<BTEditorNode>): DataEdgeTerminal[] {
+  private prepareVertexData(tree_layout: FlextreeNode<BTEditorNode>): DataEdgeTerminal[] {
     const data_points: DataEdgeTerminal[] = []
 
     tree_layout.each((node: FlextreeNode<BTEditorNode>) => {
@@ -265,12 +314,15 @@ export class D3TreeDataDisplay {
     const data_vertices = this.vertices_element
       .selectChildren<SVGGElement, DataEdgeTerminal>('.' + data_vert_group_css_class)
       .data(data_points, (d) => d.node.id! + '###' + d.kind + '###' + d.key)
-      .join((enter) => drawNewDataVert(enter, this.draw_indicator))
+      .join((enter) => drawNewDataVert(this.draw_indicator, this.highlightElemCB, enter))
 
     // Since descriptions of DataVerts can change, they are added out here
     data_vertices
       .select('.' + data_vert_label_css_class)
+      .select('.' + data_vert_label_name_css_class)
       .text((d) => replaceNameIdParts(d.key))
+    data_vertices
+      .select('.' + data_vert_label_css_class)
       .select('.' + data_vert_label_type_css_class)
       .text((d) => '(type: ' + prettyprint_type(d.type) + ')')
 
@@ -312,19 +364,14 @@ export class D3TreeDataDisplay {
       .attr('transform', (d) => 'translate(' + d.x + ', ' + d.y + ')')
   }
 
-  private drawDataEdges(data_points: DataEdgeTerminal[]) {
+  private prepareEdgeData(data_points: DataEdgeTerminal[]): DataEdge[] {
     const editor_store = useEditorStore()
 
     const tree_structure = findTree(editor_store.tree_structure_list, this.tree_id)
 
     if (tree_structure === undefined) {
-      return
+      return []
     }
-
-    // This selection is needed for callbacks
-    const data_vertices_elems = this.vertices_element.selectChildren<SVGGElement, DataEdgeTerminal>(
-      '.' + data_vert_group_css_class
-    )
 
     // Construct edge array by matching tree_msg wirings
     const data_edges: DataEdge[] = []
@@ -367,6 +414,17 @@ export class D3TreeDataDisplay {
       }
     })
 
+    return data_edges
+  }
+
+  private drawDataEdges(data_points: DataEdgeTerminal[]) {
+    const data_edges = this.prepareEdgeData(data_points)
+
+    // This selection is needed for callbacks
+    const data_vertices_elems = this.vertices_element.selectChildren<SVGGElement, DataEdgeTerminal>(
+      '.' + data_vert_group_css_class
+    )
+
     const edge_selection = this.edges_element
       .selectChildren<SVGPathElement, DataEdge>('.' + data_edge_css_class)
       .data(
@@ -384,47 +442,8 @@ export class D3TreeDataDisplay {
           '###' +
           d.target.index
       )
-      .join('path')
-      .classed(data_edge_css_class, true)
-      .on('click.select', (event, edge: DataEdge) => {
-        if (event.ctrlKey) {
-          return // Do nothing if ctrl is pressed
-        }
-        editor_store.selectEdge(edge.wiring)
-        event.stopPropagation()
-      })
-      .on('mouseover.highlight', function (ev, edge: DataEdge) {
-        if (editor_store.is_dragging) {
-          return // No highlights while dragging
-        }
-        data_vertices_elems
-          .filter((term: DataEdgeTerminal) => term === edge.source || term === edge.target)
-          .dispatch('mouseover')
-          .attr('id', (term: DataEdgeTerminal) =>
-            term.kind === IOKind.INPUT ? data_vert2_highlight_css_id : data_vert1_highlight_css_id
-          )
-          //Hide target label
-          .select('.' + data_vert_label_css_class)
-          .attr('visibility', (term: DataEdgeTerminal) => {
-            if (term.kind === IOKind.INPUT) {
-              return 'hidden'
-            }
-            return 'visible'
-          })
+      .join((enter) => drawNewDataEdge(data_vertices_elems, this.highlightElemCB, enter))
 
-        d3.select(this)
-          .classed(data_graph_hover_css_class, true)
-          .attr('id', data_edge_highlight_css_id)
-      })
-      .on('mouseout.highlight', function (ev, edge: DataEdge) {
-        if (editor_store.is_dragging) {
-          return // No highlights while dragging
-        }
-        data_vertices_elems
-          .filter((term: DataEdgeTerminal) => term === edge.source || term === edge.target)
-          .dispatch('mouseout')
-        d3.select(this).classed(data_graph_hover_css_class, false).attr('id', null)
-      })
     let edge_transition
     if (this.tree_transition === undefined) {
       edge_transition = edge_selection
@@ -435,7 +454,7 @@ export class D3TreeDataDisplay {
   }
 
   public drawTreeData(tree_layout: FlextreeNode<BTEditorNode>) {
-    const data_points = this.prepareTreeData(tree_layout)
+    const data_points = this.prepareVertexData(tree_layout)
 
     this.drawDataVerts(data_points)
 
