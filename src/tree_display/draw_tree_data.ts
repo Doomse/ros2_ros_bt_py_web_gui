@@ -461,6 +461,11 @@ export class D3TreeDataDisplay {
     this.drawDataEdges(data_points)
   }
 
+  public clearTreeData() {
+    this.vertices_element.selectChildren().remove()
+    this.edges_element.selectChildren().remove()
+  }
+
   public highlightCompatibleVertices(other_endpoint: DataEdgeTerminal) {
     this.vertices_element
       .selectChildren<SVGGElement, DataEdgeTerminal>('.' + data_vert_group_css_class)

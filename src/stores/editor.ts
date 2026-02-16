@@ -83,6 +83,8 @@ export const useEditorStore = defineStore(
 
     const has_selected_subtree = computed<boolean>(() => selected_tree.value !== uuid.NIL)
 
+    const expanded_subtrees = ref<UUIDString[]>([])
+
     const quick_save_location = ref<string>('')
 
     const selected_edge = ref<Wiring | undefined>(undefined)
@@ -175,6 +177,7 @@ export const useEditorStore = defineStore(
     return {
       selected_tree,
       has_selected_subtree,
+      expanded_subtrees,
       publish_subtrees,
       publish_data,
       debug,

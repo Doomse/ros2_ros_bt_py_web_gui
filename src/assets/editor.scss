@@ -147,6 +147,14 @@ rect.selection {
   fill: black;
 }
 
+.button_icon path {
+  fill: white;
+}
+
+.lightmode .button_icon path {
+  fill: black;
+}
+
 .label {
   pointer-events: none;
   fill: #eff0f4;

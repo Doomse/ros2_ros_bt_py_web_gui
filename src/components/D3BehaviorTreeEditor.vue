@@ -68,7 +68,7 @@ import {
   node_selected_css_class,
   tree_node_css_class,
   node_state_css_class,
-  icon_width,
+  state_icon_width,
   node_padding,
   data_graph_hover_css_class
 } from '@/tree_display/draw_tree_config'
@@ -215,7 +215,12 @@ function dragPanTimerHandler() {
 }
 
 watch(
-  [tree_display, () => editor_store.tree_structure_list, () => editor_store.is_layer_mode],
+  [
+    tree_display,
+    () => editor_store.tree_structure_list,
+    () => editor_store.expanded_subtrees,
+    () => editor_store.is_layer_mode
+  ],
   drawEverything,
   {
     immediate: true
@@ -231,6 +236,8 @@ function drawEverything() {
     console.warn('Tree display unset')
     return
   }
+
+  // TODO Clear outdated subtrees from expanded list
 
   // Prepare transition config for synchronization, the typed select statement is necessary to give the transition appropriate typing
   const tree_transition = d3
@@ -319,7 +326,10 @@ function updateNodeState() {
       const icon = getIcon(node.data.state)
       return '0 0 ' + icon[0] + ' ' + icon[1]
     })
-    .attr('x', (node) => node.data.offset.x + node.data.size.width - icon_width - node_padding)
+    .attr(
+      'x',
+      (node) => node.data.offset.x + node.data.size.width - state_icon_width - node_padding
+    )
     .attr('y', (node) => node.data.offset.y + node_padding)
     .select<SVGPathElement>('path')
     .attr('d', (node) => {

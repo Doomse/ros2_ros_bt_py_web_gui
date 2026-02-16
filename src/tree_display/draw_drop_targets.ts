@@ -320,6 +320,10 @@ export class D3DropTargetDisplay {
       })
   }
 
+  public clearDropTargets() {
+    this.targets_element.selectChildren().remove()
+  }
+
   public toggleExistingNodeTargets(dragged_node: d3.HierarchyNode<BTEditorNode>) {
     const targets = this.targets_element.selectChildren<SVGRectElement, DropTarget>(
       '.' + drop_target_css_class

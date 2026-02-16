@@ -48,7 +48,7 @@ import {
   node_name_css_class,
   node_class_css_class,
   node_state_css_class,
-  icon_width,
+  state_icon_width,
   node_name_height,
   name_line_length,
   name_first_line_indent,
@@ -58,11 +58,14 @@ import {
   node_spacing,
   tree_edge_css_class,
   node_inner_css_class,
-  node_warn_css_class
+  node_warn_css_class,
+  node_button_css_class,
+  button_icon_size
 } from './draw_tree_config'
 import { findTree, findTreeContainingNode, getNodeStructures } from '../tree_selection'
 import { D3TreeDataDisplay, getDataVertOffsets } from './draw_tree_data'
 import { D3DropTargetDisplay } from './draw_drop_targets'
+import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons'
 
 const line_wrap_regex: RegExp = /[a-z0-9][A-Z]|[_\- ][a-zA-Z]/dg
 
@@ -93,13 +96,20 @@ function drawNewNodes(
   group.append<SVGTextElement>('text').classed(node_class_css_class, true)
 
   group
-    .append('svg')
+    .append<SVGSVGElement>('svg')
     .classed(node_state_css_class, true)
-    .attr('width', icon_width)
-    .attr('height', icon_width)
+    .attr('width', state_icon_width)
+    .attr('height', state_icon_width)
     .append('path')
 
   group.append<SVGGElement>('g').classed(node_inner_css_class, true)
+
+  group
+    .append<SVGSVGElement>('svg')
+    .classed(node_button_css_class, true)
+    .attr('width', button_icon_size)
+    .attr('height', button_icon_size)
+    .append('path')
 
   group.append<SVGTextElement>('text').classed(node_warn_css_class, true)
 
@@ -113,26 +123,31 @@ function resetNodeBody(
 ) {
   // Reset width and height of background rect
   selection
-    .select<SVGRectElement>('.' + node_body_css_class)
+    .selectChild<SVGRectElement>('.' + node_body_css_class)
     .attr('x', null)
     .attr('y', null)
     .attr('width', null)
     .attr('height', null)
 
   selection
-    .select<SVGTextElement>('.' + node_name_css_class)
+    .selectChild<SVGTextElement>('.' + node_name_css_class)
     .selectChildren<SVGTSpanElement, never>('tspan')
     .remove()
 
   selection
-    .select<SVGTextElement>('.' + node_class_css_class)
+    .selectChild<SVGTextElement>('.' + node_class_css_class)
     .selectChildren<SVGTSpanElement, never>('tspan')
     .remove()
 
   selection
-    .select<SVGSVGElement>('.' + node_state_css_class)
-    .attr('x', 0)
-    .attr('y', 0)
+    .selectChild<SVGSVGElement>('.' + node_state_css_class)
+    .attr('x', null)
+    .attr('y', null)
+
+  selection
+    .selectChild<SVGSVGElement>('.' + node_button_css_class)
+    .attr('x', null)
+    .attr('y', null)
 }
 
 function drawSubtrees(
@@ -145,13 +160,19 @@ function drawSubtrees(
 
   const new_subtree_nodes = new Set(editor_store.tree_structure_list.map((tree) => tree.tree_id))
 
-  old_subtree_nodes.difference(new_subtree_nodes).forEach((key) => {
+  const expanded_subtrees = new Set(editor_store.expanded_subtrees)
+
+  const removed_subtrees = old_subtree_nodes.difference(new_subtree_nodes)
+
+  const added_subtrees = new_subtree_nodes.difference(old_subtree_nodes)
+
+  removed_subtrees.forEach((key) => {
     outer_tree_display.nested_subtrees.get(key)!.clearTree()
     outer_tree_display.nested_subtrees.delete(key)
   })
 
   selection
-    .filter((node) => new_subtree_nodes.difference(old_subtree_nodes).has(node.data.node_id))
+    .filter((node) => added_subtrees.has(node.data.node_id))
     .each(function (node) {
       const nested_tree_display = new D3TreeDisplay(
         node.data.node_id,
@@ -163,15 +184,25 @@ function drawSubtrees(
       outer_tree_display.nested_subtrees.set(node.data.node_id, nested_tree_display)
     })
 
-  outer_tree_display.nested_subtrees.values().forEach((display) => display.drawTree())
+  outer_tree_display.nested_subtrees.values().forEach((display) => {
+    if (expanded_subtrees.has(display.tree_id)) {
+      display.drawTree()
+    } else {
+      display.clearTree()
+    }
+  })
 
   selection
     .filter((node) => new_subtree_nodes.has(node.data.node_id))
     .selectChild<SVGGElement>('.' + node_inner_css_class)
-    .attr('transform', function () {
-      const rect = this.getBBox()
-      // Downscale and center subtree
-      return `translate(${rect.width / 2 / 2 + node_padding},10) scale(0.5)`
+    .attr('transform', function (node) {
+      if (expanded_subtrees.has(node.data.node_id)) {
+        const rect = this.getBBox()
+        // Downscale and center subtree
+        return `translate(${rect.width / 2 / 2 + node_padding},${button_icon_size / 2}) scale(0.5)`
+      } else {
+        return null
+      }
     })
 }
 
@@ -232,7 +263,7 @@ function layoutText(
 
     // Update variables for next line
     if (current_index === 0) {
-      max_width = tspan.node()!.getComputedTextLength() + icon_width + node_padding
+      max_width = tspan.node()!.getComputedTextLength() + state_icon_width + node_padding
     } else {
       max_width = Math.max(max_width, tspan.node()!.getComputedTextLength())
     }
@@ -279,6 +310,67 @@ function layoutText(
   return max_width
 }
 
+function updateButton(
+  element: SVGSVGElement,
+  node: d3.HierarchyNode<BTEditorNode>,
+  node_height: number
+): number {
+  const editor_store = useEditorStore()
+
+  const subtree_nodes = new Set(editor_store.tree_structure_list.map((tree) => tree.tree_id))
+
+  const expanded_subtrees = new Set(editor_store.expanded_subtrees)
+
+  const svg_elem = d3.select(element)
+
+  if (!subtree_nodes.has(node.data.node_id)) {
+    svg_elem.selectChild('path').attr('d', null)
+    return 0
+  }
+
+  let icon
+  let extra_height
+  let vert_offset
+  if (expanded_subtrees.has(node.data.node_id)) {
+    // Draw collapse icon top-center
+    icon = faCaretUp.icon
+    extra_height = 0
+    vert_offset = 0
+  } else {
+    // Draw expand icon bottom-center
+    icon = faCaretDown.icon
+    extra_height = button_icon_size
+    vert_offset = node_height
+  }
+
+  svg_elem
+    .attr('viewBox', '0 0 ' + icon[0] + ' ' + icon[1])
+    .attr('x', node.data.offset.x + node.data.size.width / 2 - button_icon_size / 2)
+    .attr('y', node.data.offset.y + vert_offset)
+    .on('click.expand', (event) => {
+      if (expanded_subtrees.has(node.data.node_id)) {
+        editor_store.expanded_subtrees = editor_store.expanded_subtrees.filter(
+          (val) => val !== node.data.node_id
+        )
+      } else {
+        // Fresh assignment is necessary to trigger watchers
+        editor_store.expanded_subtrees = editor_store.expanded_subtrees.concat([node.data.node_id])
+      }
+      event.stopPropagation()
+    })
+    .select('path')
+    .attr('d', () => {
+      if (typeof icon[4] === 'string') {
+        return icon[4]
+      } else {
+        console.warn('Potentially unhandled multivalue path', icon[4])
+        return icon[4].join('')
+      }
+    })
+
+  return extra_height
+}
+
 function updateNodeBody(
   selection: d3.Selection<SVGGElement, d3.HierarchyNode<BTEditorNode>, SVGGElement, never>
 ) {
@@ -296,7 +388,7 @@ function updateNodeBody(
     node.data.size.width = layoutText(this, node, has_duplicates ? 36 : 0)
   })
 
-  // Get width and height from text content
+  // Get width and offset from text content
   selection.each(function (node) {
     const min_height = Math.max(
       getDataVertOffsets(node.data.inputs).at(-1)!,
@@ -308,7 +400,17 @@ function updateNodeBody(
     node.data.offset.y = rect.y - 0.5 * node_padding
     // Width has already been set by text layout function
     node.data.size.width = Math.max(node.data.size.width, rect.width) + 2 * node_padding
-    node.data.size.height = Math.max(rect.height + 1.5 * node_padding, min_height)
+
+    const extra_height = updateButton(
+      d3
+        .select(this)
+        .selectChild<SVGSVGElement>('.' + node_button_css_class)
+        .node()!,
+      node,
+      rect.height
+    )
+
+    node.data.size.height = Math.max(rect.height + 1.5 * node_padding + extra_height, min_height)
   })
 
   selection
@@ -621,7 +723,11 @@ export class D3TreeDisplay {
   }
 
   public clearTree() {
-    this.root_element.selectChildren().remove()
+    this.vertices_element.selectChildren().remove()
+    this.edges_element.selectChildren().remove()
+    this.data_display.clearTreeData()
+    this.drop_target_display.clearDropTargets()
+    this.nested_subtrees.clear()
   }
 
   public toggleExistingNodeDropTargets(dragged_node: d3.HierarchyNode<BTEditorNode>) {
