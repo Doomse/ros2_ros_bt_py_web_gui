@@ -99,6 +99,18 @@ export function compareWirings(w1: Wiring, w2: Wiring): boolean {
   )
 }
 
+export function findNodeForSubtree(
+  tree: TreeStructure,
+  tree_id: UUIDString
+): NodeStructure | undefined {
+  return tree.nodes.find((node) => {
+    if (node.tree_ref === '') {
+      return false
+    }
+    return rosToUuid(node.tree_ref) === tree_id
+  })
+}
+
 export function typesCompatible(a: DataEdgeTerminal, b: DataEdgeTerminal) {
   if (a.node.data.node_id === b.node.data.node_id) {
     return false

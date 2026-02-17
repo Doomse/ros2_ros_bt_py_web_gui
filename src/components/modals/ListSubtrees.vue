@@ -31,8 +31,7 @@
 import * as uuid from 'uuid'
 import { useEditorStore } from '@/stores/editor'
 import type { TreeStructure, UUIDString } from '@/types/types'
-import { rosToUuid } from '@/utils'
-import { findNodeInTreeList, findTree, getNodeStructures } from '@/tree_selection'
+import { findNodeForSubtree, rosToUuid } from '@/utils'
 import { computed, ref } from 'vue'
 
 const editor_store = useEditorStore()
@@ -51,17 +50,23 @@ const current_tree = computed<TreeStructure | undefined>(() => {
   return findTree(editor_store.tree_structure_list, props.tree_id)
 })
 
-const subtree_ids = computed<Set<UUIDString>>(() => {
+const subtree_ids = computed<UUIDString[]>(() => {
   if (current_tree.value === undefined) {
-    return new Set<UUIDString>()
+    return []
   }
-  const node_ids = new Set<UUIDString>(
-    current_tree.value.nodes.map((node) => rosToUuid(node.node_id))
-  )
   const tree_ids = new Set<UUIDString>(
-    editor_store.tree_structure_list.map((struc) => rosToUuid(struc.tree_id))
+    editor_store.tree_structure_list.map((t) => rosToUuid(t.tree_id))
   )
-  return node_ids.intersection(tree_ids)
+  const subtree_ids: UUIDString[] = []
+  current_tree.value.nodes.forEach((node) => {
+    if (node.tree_ref !== '') {
+      const t_id = rosToUuid(node.tree_ref)
+      if (tree_ids.has(t_id)) {
+        subtree_ids.push(t_id)
+      }
+    }
+  })
+  return subtree_ids
 })
 
 const tree_name = computed<string>(() => {
@@ -75,11 +80,11 @@ const node_name = computed<string>(() => {
   if (props.tree_id === uuid.NIL) {
     return 'Main Tree'
   }
-  const node = findNodeInTreeList(
-    editor_store.tree_structure_list,
-    getNodeStructures,
-    props.tree_id
-  )
+  const outer_tree = editor_store.findOuterTree(props.tree_id)
+  if (outer_tree === undefined) {
+    return 'UNKNOWN'
+  }
+  const node = findNodeForSubtree(outer_tree, props.tree_id)
   if (node === undefined) {
     return 'UNKNOWN'
   }
@@ -104,7 +109,7 @@ function selectTree() {
         {{ node_name }} ({{ tree_name }})
       </button>
       <button
-        v-if="subtree_ids.size > 0"
+        v-if="subtree_ids.length > 0"
         class="btn btn-outline-contrast"
         @click="show_subtrees = !show_subtrees"
       >
