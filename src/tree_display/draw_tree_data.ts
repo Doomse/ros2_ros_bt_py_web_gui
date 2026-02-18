@@ -213,7 +213,8 @@ function drawNewDataEdge(
       if (event.ctrlKey) {
         return // Do nothing if ctrl is pressed
       }
-      editor_store.selectEdge(edge.wiring)
+      // Can use either source or target to find tree_id since they're in the same tree
+      editor_store.selectEdge(edge.source.node.data.tree_id, edge.wiring)
       event.stopPropagation()
     })
     .on('mouseover.highlight', function (ev, edge: DataEdge) {
@@ -320,7 +321,7 @@ export class D3TreeDataDisplay {
     data_vertices
       .select('.' + data_vert_label_css_class)
       .select('.' + data_vert_label_name_css_class)
-      .text((d) => replaceNameIdParts(d.key))
+      .text((d) => replaceNameIdParts(d.node.data.tree_id, d.key))
     data_vertices
       .select('.' + data_vert_label_css_class)
       .select('.' + data_vert_label_type_css_class)

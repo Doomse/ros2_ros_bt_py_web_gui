@@ -72,14 +72,14 @@ async function addToTree() {
     return
   }
 
-  const new_node_name = await addNode(
+  const new_node_id = await addNode(
     edit_node_store.buildNodeMsg(),
     selected_parent.value !== null ? rosToUuid(selected_parent.value.node_id) : uuid.NIL,
     -1
   )
 
   edit_node_store.clearNodeHasChanged()
-  edit_node_store.editorSelectionChange(new_node_name)
+  edit_node_store.editorSelectionChange(uuid.NIL, new_node_id)
 }
 </script>
 

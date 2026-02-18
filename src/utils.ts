@@ -73,13 +73,18 @@ export function compareRosUuid(u1: UUIDMsg, u2: UUIDMsg): boolean {
   return rosToUuid(u1) === rosToUuid(u2)
 }
 
-export function replaceNameIdParts(name_id_parts: string): string {
+export function replaceNameIdParts(tree_id: UUIDString, name_id_parts: string): string {
   const editor_store = useEditorStore()
   return name_id_parts
     .split('.')
     .map((name_id) => {
       // If this is the id of a node, replace it with its name
-      const node = findNodeInTreeList(editor_store.tree_structure_list, getNodeStructures, name_id)
+      const node = findNodeInTreeList(
+        editor_store.tree_structure_list,
+        getNodeStructures,
+        tree_id,
+        name_id
+      )
       if (node === undefined) {
         return name_id
       }
@@ -97,18 +102,6 @@ export function compareWirings(w1: Wiring, w2: Wiring): boolean {
     w1.target.data_kind === w2.target.data_kind &&
     w1.target.data_key === w2.target.data_key
   )
-}
-
-export function findNodeForSubtree(
-  tree: TreeStructure,
-  tree_id: UUIDString
-): NodeStructure | undefined {
-  return tree.nodes.find((node) => {
-    if (node.tree_ref === '') {
-      return false
-    }
-    return rosToUuid(node.tree_ref) === tree_id
-  })
 }
 
 export function typesCompatible(a: DataEdgeTerminal, b: DataEdgeTerminal) {

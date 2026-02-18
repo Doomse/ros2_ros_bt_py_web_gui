@@ -36,7 +36,6 @@ import {
   type DataEdge,
   type DropTarget,
   type BTEditorNode,
-  type UUIDString,
   NodeStateValues
 } from '@/types/types'
 import { IOKind } from '@/types/types'
@@ -114,7 +113,7 @@ let selection: boolean = false
 let mouse_moved: boolean = false
 let start_x: number = 0.0
 let start_y: number = 0.0
-const selected_nodes = ref<UUIDString[]>([])
+const selected_nodes = ref<BTEditorNode[]>([])
 
 let pan_interval_id: number | undefined = undefined
 let pan_direction: number[] = [0.0, 0.0]
@@ -286,6 +285,7 @@ function updateNodeState() {
       const node_state = findNodeInTreeList(
         editor_store.tree_state_list,
         getNodeStates,
+        node.data.tree_id,
         node.data.node_id
       )
       if (node_state !== undefined) {
@@ -402,7 +402,7 @@ function toggleDataEdgeTargets() {
 }
 
 watch(
-  () => [edit_node_store.selected_node_ids, selected_nodes.value],
+  () => [edit_node_store.selected_node_id_pairs, selected_nodes.value],
   () => colorSelectedNodes()
 )
 function colorSelectedNodes() {
@@ -412,19 +412,33 @@ function colorSelectedNodes() {
   }
 
   // Color all nodes that are in either set but not both
-  const old_selected_nodes = edit_node_store.selected_node_ids.filter(
-    (node: string) => !selected_nodes.value.includes(node)
+  const old_selected_nodes = edit_node_store.selected_node_id_pairs.filter(
+    (id_pair) =>
+      selected_nodes.value.find(
+        (node) => node.tree_id === id_pair.tree && node.node_id === id_pair.node
+      ) === undefined
   )
-  const new_selected_nodes = selected_nodes.value.filter(
-    (node: string) => !edit_node_store.selected_node_ids.includes(node)
-  )
+  const new_selected_nodes = selected_nodes.value
+    .filter(
+      (node) =>
+        edit_node_store.selected_node_id_pairs.find(
+          (id_pair) => node.tree_id === id_pair.tree && node.node_id === id_pair.node
+        ) === undefined
+    )
+    .map((node) => {
+      return { tree: node.tree_id, node: node.node_id }
+    })
   const all_selected_nodes = old_selected_nodes.concat(new_selected_nodes)
 
   d3.select<SVGGElement, never>(svg_g_ref.value)
     .selectAll<SVGSVGElement, FlextreeNode<BTEditorNode>>('.' + tree_node_css_class)
     .select<SVGRectElement>('.' + node_body_css_class)
-    .classed(node_selected_css_class, (node: FlextreeNode<BTEditorNode>) =>
-      all_selected_nodes.includes(node.data.node_id)
+    .classed(
+      node_selected_css_class,
+      (node: FlextreeNode<BTEditorNode>) =>
+        all_selected_nodes.find(
+          (id_pair) => node.data.tree_id === id_pair.tree && node.data.node_id === id_pair.node
+        ) !== undefined
     )
 }
 
@@ -593,7 +607,7 @@ onMounted(() => {
 
       sel_rect.attr('width', width).attr('height', height)
 
-      const temp_selected_nodes: string[] = []
+      const temp_selected_nodes: BTEditorNode[] = []
 
       // Update which nodes are in the selection
       d3.select<SVGGElement, never>(svg_g_ref.value)
@@ -608,7 +622,7 @@ onMounted(() => {
             node.y >= new_y &&
             node.y + node.data.size.height <= new_y + height
           ) {
-            temp_selected_nodes.push(node.data.node_id)
+            temp_selected_nodes.push(node.data)
           }
         })
 
@@ -630,7 +644,14 @@ onMounted(() => {
       const sel_rect = d3.select<SVGRectElement, never>(selection_rect_ref.value)
       sel_rect.attr('width', 0).attr('height', 0)
 
-      edit_node_store.selectMultipleNodes(selected_nodes.value)
+      edit_node_store.selectMultipleNodes(
+        selected_nodes.value.map((node) => {
+          return {
+            tree: node.tree_id,
+            node: node.node_id
+          }
+        })
+      )
 
       selected_nodes.value = []
     }

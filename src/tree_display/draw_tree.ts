@@ -62,7 +62,7 @@ import {
   node_button_css_class,
   button_icon_size
 } from './draw_tree_config'
-import { findTree, findTreeContainingNode, getNodeStructures } from '../tree_selection'
+import { findTree } from '../tree_selection'
 import { D3TreeDataDisplay, getDataVertOffsets } from './draw_tree_data'
 import { D3DropTargetDisplay } from './draw_drop_targets'
 import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons'
@@ -82,9 +82,14 @@ function drawNewNodes(
         return // Do nothing if ctrl is pressed
       }
       if (event.shiftKey) {
-        edit_node_store.selectMultipleNodes([node.data.node_id])
+        edit_node_store.selectMultipleNodes([
+          {
+            tree: node.data.tree_id,
+            node: node.data.node_id
+          }
+        ])
       } else {
-        edit_node_store.editorSelectionChange(node.data.node_id)
+        edit_node_store.editorSelectionChange(node.data.tree_id, node.data.node_id)
       }
       event.stopPropagation()
     })
@@ -172,16 +177,16 @@ function drawSubtrees(
   })
 
   selection
-    .filter((node) => added_subtrees.has(node.data.node_id))
+    .filter((node) => added_subtrees.has(node.data.tree_ref))
     .each(function (node) {
       const nested_tree_display = new D3TreeDisplay(
-        node.data.node_id,
+        node.data.tree_ref,
         false,
         outer_tree_display.draw_indicator,
         outer_tree_display.highlightElemCB,
         d3.select(this).selectChild('.' + node_inner_css_class)!
       )
-      outer_tree_display.nested_subtrees.set(node.data.node_id, nested_tree_display)
+      outer_tree_display.nested_subtrees.set(node.data.tree_ref, nested_tree_display)
     })
 
   outer_tree_display.nested_subtrees.values().forEach((display) => {
@@ -193,10 +198,10 @@ function drawSubtrees(
   })
 
   selection
-    .filter((node) => new_subtree_nodes.has(node.data.node_id))
+    .filter((node) => new_subtree_nodes.has(node.data.tree_ref))
     .selectChild<SVGGElement>('.' + node_inner_css_class)
     .attr('transform', function (node) {
-      if (expanded_subtrees.has(node.data.node_id)) {
+      if (expanded_subtrees.has(node.data.tree_ref)) {
         const rect = this.getBBox()
         // Downscale and center subtree
         return `translate(${rect.width / 2 / 2 + node_padding},${button_icon_size / 2}) scale(0.5)`
@@ -323,7 +328,7 @@ function updateButton(
 
   const svg_elem = d3.select(element)
 
-  if (!subtree_nodes.has(node.data.node_id)) {
+  if (!subtree_nodes.has(node.data.tree_ref)) {
     svg_elem.selectChild('path').attr('d', null)
     return 0
   }
@@ -331,7 +336,7 @@ function updateButton(
   let icon
   let extra_height
   let vert_offset
-  if (expanded_subtrees.has(node.data.node_id)) {
+  if (expanded_subtrees.has(node.data.tree_ref)) {
     // Draw collapse icon top-center
     icon = faCaretUp.icon
     extra_height = 0
@@ -348,13 +353,13 @@ function updateButton(
     .attr('x', node.data.offset.x + node.data.size.width / 2 - button_icon_size / 2)
     .attr('y', node.data.offset.y + vert_offset)
     .on('click.expand', (event) => {
-      if (expanded_subtrees.has(node.data.node_id)) {
+      if (expanded_subtrees.has(node.data.tree_ref)) {
         editor_store.expanded_subtrees = editor_store.expanded_subtrees.filter(
-          (val) => val !== node.data.node_id
+          (val) => val !== node.data.tree_ref
         )
       } else {
         // Fresh assignment is necessary to trigger watchers
-        editor_store.expanded_subtrees = editor_store.expanded_subtrees.concat([node.data.node_id])
+        editor_store.expanded_subtrees = editor_store.expanded_subtrees.concat([node.data.tree_ref])
       }
       event.stopPropagation()
     })
@@ -375,8 +380,12 @@ function updateNodeBody(
   selection: d3.Selection<SVGGElement, d3.HierarchyNode<BTEditorNode>, SVGGElement, never>
 ) {
   selection.each(function (node) {
-    const input_set = new Set(node.data.inputs.map((d) => replaceNameIdParts(d.key)))
-    const output_set = new Set(node.data.outputs.map((d) => replaceNameIdParts(d.key)))
+    const input_set = new Set(
+      node.data.inputs.map((d) => replaceNameIdParts(node.data.tree_id, d.key))
+    )
+    const output_set = new Set(
+      node.data.outputs.map((d) => replaceNameIdParts(node.data.tree_id, d.key))
+    )
     const has_duplicates =
       input_set.size < node.data.inputs.length && output_set.size < node.data.outputs.length
 
@@ -501,6 +510,8 @@ export class D3TreeDisplay {
         options: node.options.map(onlyKeyAndType),
         inputs: node.inputs.map(onlyKeyAndType),
         outputs: node.outputs.map(onlyKeyAndType),
+        tree_ref: node.tree_ref ? rosToUuid(node.tree_ref) : '',
+        tree_id: this.tree_id,
         size: { width: 1, height: 1 },
         offset: { x: 0, y: 0 }
       } as BTEditorNode
@@ -516,6 +527,8 @@ export class D3TreeDisplay {
       inputs: [],
       outputs: [],
       options: [],
+      tree_ref: '',
+      tree_id: this.tree_id,
       size: { width: 0, height: 0 },
       offset: { x: 0, y: 0 }
     }
@@ -731,20 +744,7 @@ export class D3TreeDisplay {
   }
 
   public toggleExistingNodeDropTargets(dragged_node: d3.HierarchyNode<BTEditorNode>) {
-    const editor_store = useEditorStore()
-
-    const target_tree = findTreeContainingNode(
-      editor_store.tree_structure_list,
-      getNodeStructures,
-      dragged_node.data.node_id
-    )
-
-    if (target_tree === undefined) {
-      console.warn("Can't find tree of dragged node")
-      return
-    }
-
-    if (this.tree_id === target_tree.tree_id) {
+    if (this.tree_id === dragged_node.data.tree_id) {
       this.drop_target_display.toggleExistingNodeTargets(dragged_node)
     } else {
       this.nested_subtrees
@@ -759,20 +759,7 @@ export class D3TreeDisplay {
   }
 
   public highlightCompatibleDataVertices(other_endpoint: DataEdgeTerminal) {
-    const editor_store = useEditorStore()
-
-    const target_tree = findTreeContainingNode(
-      editor_store.tree_structure_list,
-      getNodeStructures,
-      other_endpoint.node.data.node_id
-    )
-
-    if (target_tree === undefined) {
-      console.warn("Can't find tree of dragged node")
-      return
-    }
-
-    if (this.tree_id === target_tree.tree_id) {
+    if (this.tree_id === other_endpoint.node.data.tree_id) {
       this.data_display.highlightCompatibleVertices(other_endpoint)
     } else {
       this.nested_subtrees

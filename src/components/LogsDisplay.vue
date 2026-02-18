@@ -146,7 +146,8 @@ function selectNode(log_msg: LogMessage): boolean {
   }
   if (selectTree(log_msg)) {
     window.setTimeout(
-      (log_msg: LogMessage) => edit_node_store.editorSelectionChange(log_msg.node!.id),
+      (log_msg: LogMessage) =>
+        edit_node_store.editorSelectionChange(log_msg.tree!.id, log_msg.node!.id),
       100,
       log_msg
     )

@@ -79,20 +79,37 @@ export function findNode<N extends NodeMsg>(node_list: N[], node_id: UUIDString)
   return node_list.find((node) => rosToUuid(node.node_id) === node_id)
 }
 
-export function findTreeContainingNode<T extends TreeMsg>(
-  tree_list: T[],
-  node_list_acc: (t: T) => NodeMsg[],
-  node_id: UUIDString
-) {
-  return tree_list.find((tree) => findNode(node_list_acc(tree), node_id) !== undefined)
+function compareTreeRefWithId(tree_ref: UUIDMsg | '', tree_id: UUIDString): boolean {
+  if (tree_ref === '') {
+    return false
+  }
+  return rosToUuid(tree_ref) === tree_id
+}
+
+export function findOuterTree(tree_list: TreeStructure[], tree_id: UUIDString) {
+  return tree_list.find(
+    (tree) => tree.nodes.find((node) => compareTreeRefWithId(node.tree_ref, tree_id)) !== undefined
+  )
+}
+
+export function findNodeForSubtree(
+  tree_list: TreeStructure[],
+  tree_id: UUIDString
+): NodeStructure | undefined {
+  const tree = findOuterTree(tree_list, tree_id)
+  if (tree === undefined) {
+    return undefined
+  }
+  return tree.nodes.find((node) => compareTreeRefWithId(node.tree_ref, tree_id))
 }
 
 export function findNodeInTreeList<T extends TreeMsg, N extends NodeMsg>(
   tree_list: T[],
   node_list_acc: (t: T) => N[],
+  tree_id: UUIDString,
   node_id: UUIDString
 ): N | undefined {
-  const tree = findTreeContainingNode(tree_list, node_list_acc, node_id)
+  const tree = findTree(tree_list, tree_id)
   if (tree === undefined) {
     return undefined
   }
@@ -115,20 +132,13 @@ export function findWiring<W extends WiringOrData>(
   return wiring_list.find((wire_msg) => compareWirings(unifyDataAndWiring(wire_msg), target_wiring))
 }
 
-export function findTreeContainingWiring<T extends TreeMsg>(
-  tree_list: T[],
-  wiring_list_acc: (t: T) => WiringOrData[],
-  target_wiring: Wiring
-): T | undefined {
-  return tree_list.find((tree) => findWiring(wiring_list_acc(tree), target_wiring) !== undefined)
-}
-
 export function findWiringInTreeList<T extends TreeMsg, W extends WiringOrData>(
   tree_list: T[],
   wiring_list_acc: (t: T) => W[],
+  tree_id: UUIDString,
   target_wiring: Wiring
 ): W | undefined {
-  const tree = findTreeContainingWiring(tree_list, wiring_list_acc, target_wiring)
+  const tree = findTree(tree_list, tree_id)
   if (tree === undefined) {
     return undefined
   }

@@ -42,7 +42,7 @@ import {
   type ControlTreeExecutionRequest,
   type ControlTreeExecutionResponse
 } from '@/types/services/ControlTreeExecution'
-import { rosToUuid } from '@/utils'
+import { findTree } from '@/tree_selection'
 
 const ros_store = useROSStore()
 const editor_store = useEditorStore()
@@ -255,9 +255,7 @@ function saveTree() {
           title: 'Tree shutdown successful!',
           type: 'success'
         })
-        const tree = editor_store.tree_structure_list.find(
-          (tree) => rosToUuid(tree.tree_id) === uuid.NIL
-        )
+        const tree = findTree(editor_store.tree_structure_list, uuid.NIL)
         if (tree === undefined) {
           notify({
             title: 'Tree is undefined, cannot save!',

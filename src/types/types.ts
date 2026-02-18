@@ -219,6 +219,12 @@ export type BTEditorNode = {
   outputs: TrimmedNodeData[]
   options: TrimmedNodeData[]
 
+  // Reference to contained tree, if at all
+  tree_ref: UUIDString | ''
+
+  // Reference to own tree for global identification
+  tree_id: UUIDString
+
   size: { width: number; height: number }
   offset: { x: number; y: number }
 

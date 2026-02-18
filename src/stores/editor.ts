@@ -89,6 +89,8 @@ export const useEditorStore = defineStore(
 
     const selected_edge = ref<Wiring | undefined>(undefined)
 
+    const selected_edge_tree_id = ref<UUIDString | ''>('')
+
     const is_layer_mode = ref<boolean>(false)
 
     function enableSubtreePublishing(enable: boolean) {
@@ -166,28 +168,14 @@ export const useEditorStore = defineStore(
       quick_save_location.value = ''
     }
 
-    function selectEdge(edge: Wiring) {
+    function selectEdge(tree_id: UUIDString, edge: Wiring) {
       selected_edge.value = edge
+      selected_edge_tree_id.value = tree_id
     }
 
     function unselectEdge() {
       selected_edge.value = undefined
-    }
-
-    function findTree(id: UUIDString): TreeStructure | undefined {
-      return tree_structure_list.value.find((struc) => rosToUuid(struc.tree_id) === id)
-    }
-
-    function findOuterTree(id: UUIDString): TreeStructure | undefined {
-      return tree_structure_list.value.find(
-        (t_struc) =>
-          t_struc.nodes.find((n_struc) => {
-            if (n_struc.tree_ref === '') {
-              return false
-            }
-            return rosToUuid(n_struc.tree_ref) === id
-          }) !== undefined
-      )
+      selected_edge_tree_id.value = ''
     }
 
     return {
@@ -198,8 +186,6 @@ export const useEditorStore = defineStore(
       publish_data,
       debug,
       tree_structure_list,
-      findTree,
-      findOuterTree,
       tree_state_list,
       tree_data_list,
       running_commands,
@@ -222,6 +208,7 @@ export const useEditorStore = defineStore(
       skin,
       cycleEditorSkin,
       selected_edge,
+      selected_edge_tree_id,
       selectEdge,
       unselectEdge,
       quick_save_location,

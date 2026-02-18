@@ -37,9 +37,9 @@ import { computed } from 'vue'
 import type { WiringData } from '@/types/types'
 import { prettyprint_type, rosToUuid, prettyprint_value } from '@/utils'
 import {
-  getNodeStructures,
   findNodeInTreeList,
   findWiringInTreeList,
+  getNodeStructures,
   getWiringData
 } from '@/tree_selection'
 
@@ -54,6 +54,7 @@ const source_name = computed<string>(() => {
   const source_node = findNodeInTreeList(
     editor_store.tree_structure_list,
     getNodeStructures,
+    editor_store.selected_edge_tree_id,
     rosToUuid(editor_store.selected_edge.source.node_id)
   )
   if (source_node === undefined) {
@@ -69,6 +70,7 @@ const target_name = computed<string>(() => {
   const target_node = findNodeInTreeList(
     editor_store.tree_structure_list,
     getNodeStructures,
+    editor_store.selected_edge_tree_id,
     rosToUuid(editor_store.selected_edge.target.node_id)
   )
   if (target_node === undefined) {
@@ -84,6 +86,7 @@ const edge_data = computed<WiringData | undefined>(() => {
   return findWiringInTreeList(
     editor_store.tree_data_list,
     getWiringData,
+    editor_store.selected_edge_tree_id,
     editor_store.selected_edge
   )
 })
@@ -126,11 +129,17 @@ function onClickDelete() {
 }
 
 function selectSourceNode() {
-  edit_node_store.editorSelectionChange(rosToUuid(editor_store.selected_edge!.source.node_id))
+  edit_node_store.editorSelectionChange(
+    editor_store.selected_edge_tree_id,
+    rosToUuid(editor_store.selected_edge!.source.node_id)
+  )
 }
 
 function selectTargetNode() {
-  edit_node_store.editorSelectionChange(rosToUuid(editor_store.selected_edge!.target.node_id))
+  edit_node_store.editorSelectionChange(
+    editor_store.selected_edge_tree_id,
+    rosToUuid(editor_store.selected_edge!.target.node_id)
+  )
 }
 </script>
 
