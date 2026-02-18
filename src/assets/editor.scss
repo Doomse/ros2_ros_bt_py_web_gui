@@ -102,19 +102,10 @@ rect.selection {
   fill: #76a6ff !important;
 }
 
-.warn_msg,
 .node_name,
 .class_name {
-  dominant-baseline: auto;
+  dominant-baseline: hanging;
   pointer-events: none;
-}
-
-.warn_msg {
-  fill: red;
-  stroke: black;
-  stroke-width: 5px;
-  font-size: 32px;
-  paint-order: stroke;
 }
 
 .lightmode .warn_msg {

@@ -36,7 +36,8 @@ import type {
   BTEditorNode,
   TrimmedNodeData,
   Wiring,
-  UUIDString
+  UUIDString,
+  BlankDataEdge
 } from '@/types/types'
 import { IOKind } from '@/types/types'
 import { prettyprint_type, replaceNameIdParts, typesCompatible } from '@/utils'
@@ -60,7 +61,9 @@ import {
   io_edge_curve_factor,
   io_edge_curve_offset,
   data_vert_label_name_css_class,
-  data_vert_duplicate_css_class
+  data_vert_duplicate_css_class,
+  vertical_tree_offset,
+  horizontal_tree_padding
 } from './draw_tree_config'
 import { findTree } from '../tree_selection'
 import { addDataEdge } from '@/tree_manipulation'
@@ -254,6 +257,7 @@ export class D3TreeDataDisplay {
   readonly draw_indicator: SVGPathElement
   readonly vertices_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly edges_element: d3.Selection<SVGGElement, unknown, null, undefined>
+  readonly outer_edges_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void
 
   tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined> | undefined
@@ -263,7 +267,8 @@ export class D3TreeDataDisplay {
     editable: boolean,
     draw_indicator: SVGPathElement,
     highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void,
-    root_element: d3.Selection<SVGGElement, unknown, null, undefined>
+    root_element: d3.Selection<SVGGElement, unknown, null, undefined>,
+    outer_edges_element: d3.Selection<SVGGElement, unknown, null, undefined>
   ) {
     this.tree_id = tree_id
     this.editable = editable
@@ -271,6 +276,7 @@ export class D3TreeDataDisplay {
     this.highlightElemCB = highlightElemCB
     this.edges_element = root_element.append('g')
     this.vertices_element = root_element.append('g')
+    this.outer_edges_element = outer_edges_element
   }
 
   private prepareVertexData(tree_layout: FlextreeNode<BTEditorNode>): DataEdgeTerminal[] {
@@ -485,9 +491,50 @@ export class D3TreeDataDisplay {
     this.drawDataEdges(data_points)
   }
 
+  // Optionally draw extra edges to fixed positions
+  public drawOuterDataEdges(
+    outer_input_positions: Map<string, DataEdgePoint>,
+    outer_output_positions: Map<string, DataEdgePoint>
+  ) {
+    function mapDataTerm(term: DataEdgeTerminal): DataEdgePoint {
+      return {
+        x: term.x + horizontal_tree_padding,
+        y: term.y + vertical_tree_offset
+      }
+    }
+
+    const outer_data_edges: BlankDataEdge[] = []
+    this.vertices_element.selectChildren<SVGGElement, DataEdgeTerminal>().each((term) => {
+      // NOTE This is based on how outer node IO is mapped to inner nodes
+      const combined_key = term.node.data.node_id + '.' + term.key
+      if (outer_input_positions.has(combined_key)) {
+        outer_data_edges.push({
+          p1: outer_input_positions.get(combined_key)!,
+          p2: mapDataTerm(term),
+          key: combined_key + '#inputs'
+        })
+      }
+      if (outer_output_positions.has(combined_key)) {
+        outer_data_edges.push({
+          p1: mapDataTerm(term),
+          p2: outer_output_positions.get(combined_key)!,
+          key: combined_key + '#outputs'
+        })
+      }
+    })
+
+    this.outer_edges_element
+      .selectChildren<SVGPathElement, BlankDataEdge>('.' + data_edge_css_class)
+      .data(outer_data_edges, (d) => d.key)
+      .join('path')
+      .classed(data_edge_css_class, true)
+      .attr('d', (edge) => drawDataLine(edge.p1, edge.p2))
+  }
+
   public clearTreeData() {
     this.vertices_element.selectChildren().remove()
     this.edges_element.selectChildren().remove()
+    this.outer_edges_element.selectChildren().remove()
   }
 
   public highlightCompatibleVertices(other_endpoint: DataEdgeTerminal) {

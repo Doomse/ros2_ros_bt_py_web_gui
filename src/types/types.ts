@@ -180,6 +180,12 @@ export const enum IOKind {
   OTHER = 'other'
 }
 
+export type BlankDataEdge = {
+  p1: DataEdgePoint
+  p2: DataEdgePoint
+  key: string
+}
+
 export type DataEdge = {
   source: DataEdgeTerminal
   target: DataEdgeTerminal

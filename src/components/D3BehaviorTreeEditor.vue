@@ -98,10 +98,13 @@ const tree_display = computed<D3TreeDisplay | undefined>((previous) => {
 
   const root_element = d3.select(tree_root_ref.value)
 
+  // Since the main tree has no outer edges, we pass in empty maps
   return new D3TreeDisplay(
     editor_store.selected_tree,
     !editor_store.has_selected_subtree,
     draw_indicator_ref.value,
+    new Map(),
+    new Map(),
     highlightElem,
     root_element
   )

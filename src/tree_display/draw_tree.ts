@@ -35,7 +35,8 @@ import type {
   NodeIO,
   UUIDString,
   DocumentedNode,
-  DataEdgeTerminal
+  DataEdgeTerminal,
+  DataEdgePoint
 } from '@/types/types'
 import * as d3 from 'd3'
 import type { HierarchyNode, HierarchyLink } from 'd3-hierarchy'
@@ -61,7 +62,11 @@ import {
   node_warn_css_class,
   node_button_css_class,
   button_icon_size,
-  nested_tree_scaling
+  nested_tree_scaling,
+  vertical_tree_offset,
+  node_connect_css_class,
+  horizontal_tree_padding,
+  io_gripper_size
 } from './draw_tree_config'
 import { findTree } from '../tree_selection'
 import { D3TreeDataDisplay, getDataVertOffsets } from './draw_tree_data'
@@ -96,6 +101,8 @@ function drawNewNodes(
     })
 
   group.append<SVGRectElement>('rect').classed(node_body_css_class, true)
+
+  group.append<SVGGElement>('g').classed(node_connect_css_class, true)
 
   group.append<SVGTextElement>('text').classed(node_name_css_class, true)
 
@@ -182,10 +189,23 @@ function drawSubtrees(
   selection
     .filter((node) => added_subtrees.has(node.data.tree_ref))
     .each(function (node) {
+      const outer_input_offsets = new Map<string, number>()
+      const input_offsets = getDataVertOffsets(node.data.inputs)
+      node.data.inputs.forEach((data, index) => {
+        outer_input_offsets.set(data.key, input_offsets[index] / nested_tree_scaling)
+      })
+      const outer_output_offsets = new Map<string, number>()
+      const output_offsets = getDataVertOffsets(node.data.outputs)
+      node.data.outputs.forEach((data, index) => {
+        outer_output_offsets.set(data.key, output_offsets[index] / nested_tree_scaling)
+      })
+
       const nested_tree_display = new D3TreeDisplay(
         node.data.tree_ref,
         false,
         outer_tree_display.draw_indicator,
+        outer_input_offsets,
+        outer_output_offsets,
         outer_tree_display.highlightElemCB,
         d3.select(this).selectChild('.' + node_inner_css_class)!
       )
@@ -207,9 +227,9 @@ function drawSubtrees(
       if (expanded_subtrees.has(node.data.tree_ref)) {
         const rect = this.getBBox()
         // Downscale and center subtree
-        return `translate(${(rect.width * nested_tree_scaling) / 2 + node_padding},${
-          button_icon_size / 2
-        }) scale(${nested_tree_scaling})`
+        return `translate(${
+          (rect.width * nested_tree_scaling) / 2 - horizontal_tree_padding
+        },0) scale(${nested_tree_scaling})`
       } else {
         return null
       }
@@ -394,10 +414,13 @@ function updateNodeBody(
     )
 
     const rect = this.getBBox()
-    node.data.offset.x = rect.x - node_padding
-    node.data.offset.y = rect.y - 0.5 * node_padding
+    node.data.offset.x = rect.x
+    node.data.offset.y = rect.y
     // Width has already been set by text layout function
-    node.data.size.width = Math.max(node.data.size.width, rect.width) + 2 * node_padding
+    node.data.size.width = Math.max(
+      node.data.size.width + 2 * node_padding, // From text layout
+      rect.width // From inner content
+    )
 
     const extra_height = updateButton(
       d3
@@ -433,11 +456,16 @@ export class D3TreeDisplay {
   readonly tree_id: UUIDString
   readonly editable: boolean
   readonly draw_indicator: SVGPathElement
+  readonly outer_input_offsets: Map<string, number>
+  readonly outer_output_offsets: Map<string, number>
+
   readonly drop_target_display: D3DropTargetDisplay
   readonly data_display: D3TreeDataDisplay
   readonly root_element: d3.Selection<SVGGElement, unknown, null, undefined>
+  readonly tree_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly vertices_element: d3.Selection<SVGGElement, unknown, null, undefined>
   readonly edges_element: d3.Selection<SVGGElement, unknown, null, undefined>
+  readonly padding_element: d3.Selection<SVGRectElement, unknown, null, undefined>
 
   readonly highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void
 
@@ -447,27 +475,52 @@ export class D3TreeDisplay {
     tree_id: UUIDString,
     editable: boolean,
     draw_indicator: SVGPathElement,
+    outer_input_offsets: Map<string, number>,
+    outer_output_offsets: Map<string, number>,
     highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void,
     root_element: d3.Selection<SVGGElement, unknown, null, undefined>
   ) {
+    root_element.selectChildren().remove()
+
     this.tree_id = tree_id
     this.editable = editable
     this.draw_indicator = draw_indicator
+    this.outer_input_offsets = outer_input_offsets
+    this.outer_output_offsets = outer_output_offsets
     this.highlightElemCB = highlightElemCB
+
     this.root_element = root_element
-    this.edges_element = root_element.append('g')
-    this.vertices_element = root_element.append('g')
 
-    this.drop_target_display = new D3DropTargetDisplay(this.tree_id, this.editable, root_element)
+    const outer_edges_element = this.root_element.append('g')
 
-    const data_graph_element = root_element.append('g')
+    this.tree_element = root_element
+      .append('g')
+      .attr('transform', `translate(${horizontal_tree_padding},${vertical_tree_offset})`)
+    this.edges_element = this.tree_element.append('g')
+    this.vertices_element = this.tree_element.append('g')
+
+    this.drop_target_display = new D3DropTargetDisplay(
+      this.tree_id,
+      this.editable,
+      this.tree_element
+    )
+
+    const data_graph_element = this.tree_element.append('g')
     this.data_display = new D3TreeDataDisplay(
       this.tree_id,
       this.editable,
       this.draw_indicator,
       this.highlightElemCB,
-      data_graph_element
+      data_graph_element,
+      outer_edges_element
     )
+
+    // We use this padding element to establish proper padding of our subtree, whether outer edges are drawn or not
+    this.padding_element = this.root_element
+      .append('rect')
+      .attr('y', 0)
+      .attr('height', 10)
+      .attr('fill', 'none')
   }
 
   private prepareTreeData(): d3.HierarchyNode<BTEditorNode> | undefined {
@@ -716,6 +769,32 @@ export class D3TreeDisplay {
     this.data_display.drawTreeData(tree_layout)
 
     this.drop_target_display.drawDropTargets(tree_layout)
+
+    // Set the width of the padding element based on the width of the inner tree
+    const tree_box = this.tree_element.node()!.getBBox()
+    const full_width = tree_box.width + 2 * horizontal_tree_padding
+    this.padding_element.attr('x', tree_box.x).attr('width', full_width)
+
+    // Add the outer edges, if given
+    const outer_input_positions = new Map<string, DataEdgePoint>()
+    if (this.outer_input_offsets !== undefined) {
+      this.outer_input_offsets.forEach((val, key) => {
+        outer_input_positions.set(key, {
+          x: tree_box.x - io_gripper_size / 2,
+          y: val - io_gripper_size / 2
+        })
+      })
+    }
+    const outer_output_positions = new Map<string, DataEdgePoint>()
+    if (this.outer_output_offsets !== undefined) {
+      this.outer_output_offsets.forEach((val, key) => {
+        outer_output_positions.set(key, {
+          x: tree_box.x + full_width - io_gripper_size / 2,
+          y: val - io_gripper_size / 2
+        })
+      })
+    }
+    this.data_display.drawOuterDataEdges(outer_input_positions, outer_output_positions)
   }
 
   public updateTransition(tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>) {
@@ -730,6 +809,7 @@ export class D3TreeDisplay {
     this.data_display.clearTreeData()
     this.drop_target_display.clearDropTargets()
     this.nested_subtrees.clear()
+    this.padding_element.attr('x', 0).attr('width', 0)
   }
 
   public toggleExistingNodeDropTargets(dragged_node: d3.HierarchyNode<BTEditorNode>) {

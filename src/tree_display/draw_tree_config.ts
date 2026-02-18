@@ -47,11 +47,14 @@ export const node_name_height: number = 40
 export const node_class_height: number = 30
 export const drop_target_root_size: number = 150
 export const nested_tree_scaling: number = 0.5
+export const vertical_tree_offset: number = button_icon_size / nested_tree_scaling
+export const horizontal_tree_padding: number = 100
 
 // constants for css classes & ids used with d3
 export const tree_node_css_class: string = 'node'
 export const node_body_css_class: string = 'btnode'
 export const node_inner_css_class: string = 'inner'
+export const node_connect_css_class: string = 'connect'
 export const node_warn_css_class: string = 'warn_msg'
 export const node_name_css_class: string = 'node_name'
 export const node_class_css_class: string = 'class_name'
