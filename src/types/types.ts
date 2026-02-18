@@ -166,6 +166,13 @@ export type DataEdgePoint = {
   y: number
 }
 
+export type IdentifiedDataEdgePoint = DataEdgePoint & {
+  tree_id: UUIDString
+  node_id: UUIDString
+  kind: IOKind
+  key: string
+}
+
 export type DataEdgeTerminal = DataEdgePoint & {
   node: FlextreeNode<BTEditorNode>
   index: number
@@ -180,9 +187,9 @@ export const enum IOKind {
   OTHER = 'other'
 }
 
-export type BlankDataEdge = {
-  p1: DataEdgePoint
-  p2: DataEdgePoint
+export type IdentifiedDataEdge = {
+  p1: IdentifiedDataEdgePoint
+  p2: IdentifiedDataEdgePoint
   key: string
 }
 

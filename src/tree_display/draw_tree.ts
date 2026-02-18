@@ -29,14 +29,15 @@
  */
 import { useEditorStore } from '@/stores/editor'
 import { useEditNodeStore } from '@/stores/edit_node'
-import type {
-  BTEditorNode,
-  TrimmedNodeData,
-  NodeIO,
-  UUIDString,
-  DocumentedNode,
-  DataEdgeTerminal,
-  DataEdgePoint
+import {
+  type BTEditorNode,
+  type TrimmedNodeData,
+  type NodeIO,
+  type UUIDString,
+  type DocumentedNode,
+  type DataEdgeTerminal,
+  type IdentifiedDataEdgePoint,
+  IOKind
 } from '@/types/types'
 import * as d3 from 'd3'
 import type { HierarchyNode, HierarchyLink } from 'd3-hierarchy'
@@ -189,23 +190,35 @@ function drawSubtrees(
   selection
     .filter((node) => added_subtrees.has(node.data.tree_ref))
     .each(function (node) {
-      const outer_input_offsets = new Map<string, number>()
+      const outer_io_offsets = new Map<string, IdentifiedDataEdgePoint>()
       const input_offsets = getDataVertOffsets(node.data.inputs)
       node.data.inputs.forEach((data, index) => {
-        outer_input_offsets.set(data.key, input_offsets[index] / nested_tree_scaling)
+        outer_io_offsets.set(data.key, {
+          x: 0,
+          y: input_offsets[index] / nested_tree_scaling,
+          tree_id: node.data.tree_id,
+          node_id: node.data.node_id,
+          kind: IOKind.INPUT,
+          key: data.key
+        })
       })
-      const outer_output_offsets = new Map<string, number>()
       const output_offsets = getDataVertOffsets(node.data.outputs)
       node.data.outputs.forEach((data, index) => {
-        outer_output_offsets.set(data.key, output_offsets[index] / nested_tree_scaling)
+        outer_io_offsets.set(data.key, {
+          x: 0,
+          y: output_offsets[index] / nested_tree_scaling,
+          tree_id: node.data.tree_id,
+          node_id: node.data.node_id,
+          kind: IOKind.OUTPUT,
+          key: data.key
+        })
       })
 
       const nested_tree_display = new D3TreeDisplay(
         node.data.tree_ref,
         false,
         outer_tree_display.draw_indicator,
-        outer_input_offsets,
-        outer_output_offsets,
+        outer_io_offsets,
         outer_tree_display.highlightElemCB,
         d3.select(this).selectChild('.' + node_inner_css_class)!
       )
@@ -456,8 +469,7 @@ export class D3TreeDisplay {
   readonly tree_id: UUIDString
   readonly editable: boolean
   readonly draw_indicator: SVGPathElement
-  readonly outer_input_offsets: Map<string, number>
-  readonly outer_output_offsets: Map<string, number>
+  readonly outer_io_offsets: Map<string, IdentifiedDataEdgePoint>
 
   readonly drop_target_display: D3DropTargetDisplay
   readonly data_display: D3TreeDataDisplay
@@ -475,8 +487,7 @@ export class D3TreeDisplay {
     tree_id: UUIDString,
     editable: boolean,
     draw_indicator: SVGPathElement,
-    outer_input_offsets: Map<string, number>,
-    outer_output_offsets: Map<string, number>,
+    outer_io_offsets: Map<string, IdentifiedDataEdgePoint>,
     highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void,
     root_element: d3.Selection<SVGGElement, unknown, null, undefined>
   ) {
@@ -485,8 +496,7 @@ export class D3TreeDisplay {
     this.tree_id = tree_id
     this.editable = editable
     this.draw_indicator = draw_indicator
-    this.outer_input_offsets = outer_input_offsets
-    this.outer_output_offsets = outer_output_offsets
+    this.outer_io_offsets = outer_io_offsets
     this.highlightElemCB = highlightElemCB
 
     this.root_element = root_element
@@ -776,25 +786,14 @@ export class D3TreeDisplay {
     this.padding_element.attr('x', tree_box.x).attr('width', full_width)
 
     // Add the outer edges, if given
-    const outer_input_positions = new Map<string, DataEdgePoint>()
-    if (this.outer_input_offsets !== undefined) {
-      this.outer_input_offsets.forEach((val, key) => {
-        outer_input_positions.set(key, {
-          x: tree_box.x - io_gripper_size / 2,
-          y: val - io_gripper_size / 2
-        })
-      })
-    }
-    const outer_output_positions = new Map<string, DataEdgePoint>()
-    if (this.outer_output_offsets !== undefined) {
-      this.outer_output_offsets.forEach((val, key) => {
-        outer_output_positions.set(key, {
-          x: tree_box.x + full_width - io_gripper_size / 2,
-          y: val - io_gripper_size / 2
-        })
-      })
-    }
-    this.data_display.drawOuterDataEdges(outer_input_positions, outer_output_positions)
+    const outer_io_positions = new Map<string, IdentifiedDataEdgePoint>()
+    this.outer_io_offsets.forEach((val, key) => {
+      const new_val = structuredClone(val)
+      new_val.x = tree_box.x + (val.kind === IOKind.OUTPUT ? full_width : 0) - io_gripper_size / 2
+      new_val.y -= io_gripper_size / 2
+      outer_io_positions.set(key, new_val)
+    })
+    this.data_display.drawOuterDataEdges(outer_io_positions)
   }
 
   public updateTransition(tree_transition: d3.Transition<d3.BaseType, unknown, null, undefined>) {

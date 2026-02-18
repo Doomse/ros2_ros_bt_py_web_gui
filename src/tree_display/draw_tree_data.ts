@@ -37,7 +37,8 @@ import type {
   TrimmedNodeData,
   Wiring,
   UUIDString,
-  BlankDataEdge
+  IdentifiedDataEdge,
+  IdentifiedDataEdgePoint
 } from '@/types/types'
 import { IOKind } from '@/types/types'
 import { prettyprint_type, replaceNameIdParts, typesCompatible } from '@/utils'
@@ -139,7 +140,7 @@ function drawNewDataVert(
   const groups = selection
     .append('g')
     .classed(data_vert_group_css_class, true)
-    .on('mouseover.highlight', function (ev, term) {
+    .on('mouseover.highlight', function (ev) {
       if (editor_store.is_dragging) {
         // Highlight compatible vertices when dragging
         const compat = d3.select(this).classed(data_graph_comaptible_css_class)
@@ -149,10 +150,10 @@ function drawNewDataVert(
         d3.select(this)
           .select('.' + data_vert_label_css_class)
           .attr('visibility', 'visible')
-        highlightElemCB(this, term.kind === IOKind.INPUT ? 'v2' : 'v1', true)
+        highlightElemCB(this, ev.detail.additional ? 'v2' : 'v1', true)
       }
     })
-    .on('mouseout.highlight', function (ev, term) {
+    .on('mouseout.highlight', function (ev) {
       if (editor_store.is_dragging) {
         d3.select(this).classed(data_graph_hover_css_class, false)
         d3.select(draw_indicator).classed(data_graph_hover_css_class, false)
@@ -160,7 +161,7 @@ function drawNewDataVert(
         d3.select(this)
           .select('.' + data_vert_label_css_class)
           .attr('visibility', 'hidden')
-        highlightElemCB(this, term.kind === IOKind.INPUT ? 'v2' : 'v1', false)
+        highlightElemCB(this, ev.detail.additional ? 'v2' : 'v1', false)
       }
     })
 
@@ -227,7 +228,13 @@ function drawNewDataEdge(
       }
       data_vertices
         .filter((term: DataEdgeTerminal) => term === edge.source || term === edge.target)
-        .dispatch('mouseover')
+        .dispatch('mouseover', (term) => {
+          return {
+            bubbles: false,
+            cancelable: false,
+            detail: { additional: term === edge.target }
+          }
+        })
         //Hide target label
         .select('.' + data_vert_label_css_class)
         .attr('visibility', (term: DataEdgeTerminal) => {
@@ -245,10 +252,67 @@ function drawNewDataEdge(
       }
       data_vertices
         .filter((term: DataEdgeTerminal) => term === edge.source || term === edge.target)
-        .dispatch('mouseout')
+        .dispatch('mouseout', (term) => {
+          return {
+            bubbles: false,
+            cancelable: false,
+            detail: { additional: term === edge.target }
+          }
+        })
 
       highlightElemCB(this, 'e', false)
     })
+}
+
+function drawNewOuterDataEdge(
+  highlightElemCB: (a0: SVGGraphicsElement, a1: 'v1' | 'v2' | 'e', a2: boolean) => void,
+  selection: d3.Selection<d3.EnterElement, IdentifiedDataEdge, SVGGElement, unknown>
+) {
+  function compareTermToIdPoint(term: DataEdgeTerminal, id_point: IdentifiedDataEdgePoint) {
+    return (
+      term.key === id_point.key &&
+      term.kind === id_point.kind &&
+      term.node.data.node_id === id_point.node_id &&
+      term.node.data.tree_id === id_point.tree_id
+    )
+  }
+
+  return (
+    selection
+      .append('path')
+      .classed(data_edge_css_class, true)
+      // Supress click events to not accidentally select node
+      .style('cursor', 'default')
+      .on('click.cancel', (ev) => ev.stopPropagation())
+      .on('mouseover.highlight', function (ev, edge) {
+        d3.selectAll<SVGGElement, DataEdgeTerminal>('.' + data_vert_group_css_class)
+          .filter((term) => {
+            return compareTermToIdPoint(term, edge.p1) || compareTermToIdPoint(term, edge.p2)
+          })
+          .dispatch('mouseover', (term) => {
+            return {
+              bubbles: false,
+              cancelable: false,
+              detail: { additional: compareTermToIdPoint(term, edge.p2) }
+            }
+          })
+        highlightElemCB(this, 'e', true)
+      })
+      .on('mouseout.highlight', function (ev, edge) {
+        d3.selectAll<SVGGElement, DataEdgeTerminal>('.' + data_vert_group_css_class)
+          .filter((term) => {
+            return compareTermToIdPoint(term, edge.p1) || compareTermToIdPoint(term, edge.p2)
+          })
+          .dispatch('mouseout', (term) => {
+            return {
+              bubbles: false,
+              cancelable: false,
+              detail: { additional: compareTermToIdPoint(term, edge.p2) }
+            }
+          })
+        highlightElemCB(this, 'e', false)
+      })
+  )
 }
 
 export class D3TreeDataDisplay {
@@ -491,44 +555,49 @@ export class D3TreeDataDisplay {
     this.drawDataEdges(data_points)
   }
 
-  // Optionally draw extra edges to fixed positions
-  public drawOuterDataEdges(
-    outer_input_positions: Map<string, DataEdgePoint>,
-    outer_output_positions: Map<string, DataEdgePoint>
-  ) {
-    function mapDataTerm(term: DataEdgeTerminal): DataEdgePoint {
-      return {
-        x: term.x + horizontal_tree_padding,
-        y: term.y + vertical_tree_offset
-      }
+  private mapDataTerm(term: DataEdgeTerminal): IdentifiedDataEdgePoint {
+    return {
+      x:
+        term.x +
+        horizontal_tree_padding +
+        ((term.kind === IOKind.OUTPUT ? 1 : -1) * io_gripper_size) / 2,
+      y: term.y + vertical_tree_offset,
+      tree_id: this.tree_id,
+      node_id: term.node.data.node_id,
+      kind: term.kind,
+      key: term.key
     }
+  }
 
-    const outer_data_edges: BlankDataEdge[] = []
+  // Optionally draw extra edges to fixed positions
+  public drawOuterDataEdges(outer_io_positions: Map<string, IdentifiedDataEdgePoint>) {
+    const outer_data_edges: IdentifiedDataEdge[] = []
     this.vertices_element.selectChildren<SVGGElement, DataEdgeTerminal>().each((term) => {
       // NOTE This is based on how outer node IO is mapped to inner nodes
       const combined_key = term.node.data.node_id + '.' + term.key
-      if (outer_input_positions.has(combined_key)) {
+      if (outer_io_positions.has(combined_key)) {
+        const outer = outer_io_positions.get(combined_key)!
+        const inner = this.mapDataTerm(term)
         outer_data_edges.push({
-          p1: outer_input_positions.get(combined_key)!,
-          p2: mapDataTerm(term),
+          p1: outer.kind === IOKind.INPUT ? outer : inner,
+          p2: outer.kind === IOKind.INPUT ? inner : outer,
           key: combined_key + '#inputs'
-        })
-      }
-      if (outer_output_positions.has(combined_key)) {
-        outer_data_edges.push({
-          p1: mapDataTerm(term),
-          p2: outer_output_positions.get(combined_key)!,
-          key: combined_key + '#outputs'
         })
       }
     })
 
-    this.outer_edges_element
-      .selectChildren<SVGPathElement, BlankDataEdge>('.' + data_edge_css_class)
+    const edge_selection = this.outer_edges_element
+      .selectChildren<SVGPathElement, IdentifiedDataEdge>('.' + data_edge_css_class)
       .data(outer_data_edges, (d) => d.key)
-      .join('path')
-      .classed(data_edge_css_class, true)
-      .attr('d', (edge) => drawDataLine(edge.p1, edge.p2))
+      .join((enter) => drawNewOuterDataEdge(this.highlightElemCB, enter))
+
+    let edge_transition
+    if (this.tree_transition === undefined) {
+      edge_transition = edge_selection
+    } else {
+      edge_transition = edge_selection.transition(this.tree_transition)
+    }
+    edge_transition.attr('d', (edge) => drawDataLine(edge.p1, edge.p2))
   }
 
   public clearTreeData() {

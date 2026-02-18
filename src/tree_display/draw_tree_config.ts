@@ -48,7 +48,7 @@ export const node_class_height: number = 30
 export const drop_target_root_size: number = 150
 export const nested_tree_scaling: number = 0.5
 export const vertical_tree_offset: number = button_icon_size / nested_tree_scaling
-export const horizontal_tree_padding: number = 100
+export const horizontal_tree_padding: number = 20
 
 // constants for css classes & ids used with d3
 export const tree_node_css_class: string = 'node'

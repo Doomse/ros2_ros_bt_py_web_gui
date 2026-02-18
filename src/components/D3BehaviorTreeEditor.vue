@@ -69,7 +69,9 @@ import {
   node_state_css_class,
   state_icon_width,
   node_padding,
-  data_graph_hover_css_class
+  data_graph_hover_css_class,
+  vertical_tree_offset,
+  horizontal_tree_padding
 } from '@/tree_display/draw_tree_config'
 import { D3TreeDisplay } from '@/tree_display/draw_tree'
 import { findNodeInTreeList, getNodeStates } from '@/tree_selection'
@@ -98,13 +100,11 @@ const tree_display = computed<D3TreeDisplay | undefined>((previous) => {
 
   const root_element = d3.select(tree_root_ref.value)
 
-  // Since the main tree has no outer edges, we pass in empty maps
   return new D3TreeDisplay(
     editor_store.selected_tree,
     !editor_store.has_selected_subtree,
     draw_indicator_ref.value,
-    new Map(),
-    new Map(),
+    new Map(), // No outer IO to connect to
     highlightElem,
     root_element
   )
@@ -137,11 +137,12 @@ function resetView() {
     return
   }
   const viewport = d3.select(viewport_ref.value)
-  const height = viewport.node()!.getBoundingClientRect().height
-  const zoom_factor = d3.zoomTransform(viewport_ref.value).k
-  const offset = (height * 0.5) / zoom_factor - 60.0
+  const width = viewport.node()!.getBoundingClientRect().width
 
-  viewport.call(zoomObject.translateTo, 0.0, offset)
+  viewport.call(zoomObject.translateTo, horizontal_tree_padding, vertical_tree_offset, [
+    width / 2,
+    30.0
+  ])
 }
 
 function canvasMouseMovePanHandler(event: Event) {
