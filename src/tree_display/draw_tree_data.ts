@@ -359,8 +359,8 @@ export class D3TreeDataDisplay {
           kind: IOKind.INPUT,
           key: input.key,
           type: input.serialized_type,
-          x: node.x + node.data.offset.x - node.data.size.width * 0.5 - io_gripper_size,
-          y: node.y + node.data.offset.y + input_offsets[index]
+          x: node.x - node.data.size.width * 0.5 - io_gripper_size,
+          y: node.y + input_offsets[index]
         })
       })
       const output_offsets = getDataVertOffsets(node.data.outputs)
@@ -371,8 +371,8 @@ export class D3TreeDataDisplay {
           kind: IOKind.OUTPUT,
           key: output.key,
           type: output.serialized_type,
-          x: node.x + node.data.offset.x + node.data.size.width * 0.5,
-          y: node.y + node.data.offset.y + output_offsets[index]
+          x: node.x + node.data.size.width * 0.5,
+          y: node.y + output_offsets[index]
         })
       })
     })

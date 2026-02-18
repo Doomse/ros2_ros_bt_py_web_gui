@@ -67,7 +67,9 @@ import {
   vertical_tree_offset,
   node_connect_css_class,
   horizontal_tree_padding,
-  io_gripper_size
+  io_gripper_size,
+  top_padding,
+  button_icon_height
 } from './draw_tree_config'
 import { findTree } from '../tree_selection'
 import { D3TreeDataDisplay, getDataVertOffsets } from './draw_tree_data'
@@ -195,7 +197,7 @@ function drawSubtrees(
       node.data.inputs.forEach((data, index) => {
         outer_io_offsets.set(data.key, {
           x: 0,
-          y: input_offsets[index] / nested_tree_scaling,
+          y: (input_offsets[index] - top_padding) / nested_tree_scaling,
           tree_id: node.data.tree_id,
           node_id: node.data.node_id,
           kind: IOKind.INPUT,
@@ -206,7 +208,7 @@ function drawSubtrees(
       node.data.outputs.forEach((data, index) => {
         outer_io_offsets.set(data.key, {
           x: 0,
-          y: output_offsets[index] / nested_tree_scaling,
+          y: (output_offsets[index] - top_padding) / nested_tree_scaling,
           tree_id: node.data.tree_id,
           node_id: node.data.node_id,
           kind: IOKind.OUTPUT,
@@ -376,7 +378,7 @@ function updateButton(
   } else {
     // Draw expand icon bottom-center
     icon = faCaretDown.icon
-    extra_height = button_icon_size
+    extra_height = button_icon_height
     vert_offset = node_height
   }
 
@@ -415,12 +417,8 @@ function updateNodeBody(
   selection: d3.Selection<SVGGElement, d3.HierarchyNode<BTEditorNode>, SVGGElement, never>
 ) {
   selection.each(function (node) {
-    // Offset based on height of warning text
-    node.data.size.width = layoutText(this, node)
-  })
+    const min_width = layoutText(this, node)
 
-  // Get width and offset from text content
-  selection.each(function (node) {
     const min_height = Math.max(
       getDataVertOffsets(node.data.inputs).at(-1)!,
       getDataVertOffsets(node.data.outputs).at(-1)!
@@ -428,10 +426,10 @@ function updateNodeBody(
 
     const rect = this.getBBox()
     node.data.offset.x = rect.x
-    node.data.offset.y = rect.y
+    node.data.offset.y = rect.y - top_padding
     // Width has already been set by text layout function
     node.data.size.width = Math.max(
-      node.data.size.width + 2 * node_padding, // From text layout
+      min_width + 2 * node_padding, // From text layout
       rect.width // From inner content
     )
 
@@ -444,7 +442,10 @@ function updateNodeBody(
       rect.height
     )
 
-    node.data.size.height = Math.max(rect.height + 1.5 * node_padding + extra_height, min_height)
+    node.data.size.height = Math.max(
+      rect.height + top_padding + node_padding + extra_height,
+      min_height
+    )
   })
 
   selection
@@ -691,8 +692,8 @@ export class D3TreeDisplay {
       transition = new_selection.transition(this.tree_transition)
     }
     transition.attr('transform', (d: FlextreeNode<BTEditorNode>) => {
-      const x = d.x - d.data.size.width / 2.0
-      const y = d.y
+      const x = d.x - d.data.offset.x - d.data.size.width / 2.0
+      const y = d.y - d.data.offset.y
       return 'translate(' + x + ', ' + y + ')'
     })
 
@@ -753,14 +754,11 @@ export class D3TreeDisplay {
         .linkVertical<SVGPathElement, HierarchyLink<BTEditorNode>, [number, number]>()
         .source((link: HierarchyLink<BTEditorNode>) => {
           const source = link.source as FlextreeNode<BTEditorNode>
-          return [
-            source.x + source.data.offset.x,
-            source.y + source.data.offset.y + source.data.size.height
-          ]
+          return [source.x, source.y + source.data.size.height]
         })
         .target((link: HierarchyLink<BTEditorNode>) => {
           const target = link.target as FlextreeNode<BTEditorNode>
-          return [target.x + target.data.offset.x, target.y + target.data.offset.y]
+          return [target.x, target.y]
         })
     )
   }

@@ -37,17 +37,19 @@ export const io_edge_curve_offset: number = 5
 export const io_edge_curve_factor: number = 0.0001
 
 export const node_padding: number = 10
+export const top_padding: number = 0.5 * node_padding
 export const node_spacing: number = 80
 export const name_line_length: number = 20
 export const name_first_line_indent: number = 3
 export const class_line_length: number = 25
 export const state_icon_width: number = 30
 export const button_icon_size: number = 50
+export const button_icon_height: number = button_icon_size * 0.7
 export const node_name_height: number = 40
 export const node_class_height: number = 30
 export const drop_target_root_size: number = 150
 export const nested_tree_scaling: number = 0.5
-export const vertical_tree_offset: number = button_icon_size / nested_tree_scaling
+export const vertical_tree_offset: number = button_icon_height / nested_tree_scaling
 export const horizontal_tree_padding: number = 20
 
 // constants for css classes & ids used with d3
