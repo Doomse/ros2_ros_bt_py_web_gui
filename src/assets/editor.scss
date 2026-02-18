@@ -170,7 +170,11 @@ path.data-select {
 }
 
 .gripper {
-  fill: #74777f;
+  fill: slategray;
+}
+
+.gripper-duplicate {
+  fill: url(#pattern_stripes);
 }
 
 .data-link,

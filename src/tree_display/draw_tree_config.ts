@@ -46,6 +46,7 @@ export const button_icon_size: number = 50
 export const node_name_height: number = 40
 export const node_class_height: number = 30
 export const drop_target_root_size: number = 150
+export const nested_tree_scaling: number = 0.5
 
 // constants for css classes & ids used with d3
 export const tree_node_css_class: string = 'node'
@@ -63,6 +64,7 @@ export const data_vert_grip_css_class: string = 'gripper'
 export const data_vert_label_css_class: string = 'label'
 export const data_vert_label_name_css_class: string = 'label-name'
 export const data_vert_label_type_css_class: string = 'label-type'
+export const data_vert_duplicate_css_class: string = 'gripper-duplicate'
 export const data_edge_css_class: string = 'data-link'
 
 export const data_edge_highlight_css_id: string = 'hightlightEdge'

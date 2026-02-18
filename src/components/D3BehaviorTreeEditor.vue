@@ -536,7 +536,7 @@ onMounted(() => {
   const viewport = d3.select(viewport_ref.value)
 
   zoomObject = d3.zoom<SVGSVGElement, unknown>()
-  zoomObject.scaleExtent([0.3, 3.0])
+  zoomObject.scaleExtent([0.1, 10.0])
 
   const container = d3.select<SVGGElement, never>(svg_g_ref.value)
 
@@ -697,6 +697,20 @@ onMounted(() => {
 
 <template>
   <svg id="editor_viewport" ref="viewport_ref" class="reactive-svg" :class="editor_store.skin">
+    <!--Defines patterns that are used in tree display-->
+    <defs>
+      <pattern
+        id="pattern_stripes"
+        patternUnits="userSpaceOnUse"
+        width="5"
+        height="5"
+        patternTransform="rotate(45)"
+      >
+        <rect x="0" y="0" width="5" height="5" fill="slategray" />
+        <line x1="0" y="0" x2="0" y2="5" stroke="orange" stroke-width="5" />
+      </pattern>
+    </defs>
+
     <g id="container" ref="svg_g_ref">
       <g ref="tree_root_ref" />
 

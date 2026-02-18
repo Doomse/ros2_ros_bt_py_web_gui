@@ -59,7 +59,8 @@ import {
   io_edge_offset,
   io_edge_curve_factor,
   io_edge_curve_offset,
-  data_vert_label_name_css_class
+  data_vert_label_name_css_class,
+  data_vert_duplicate_css_class
 } from './draw_tree_config'
 import { findTree } from '../tree_selection'
 import { addDataEdge } from '@/tree_manipulation'
@@ -319,13 +320,35 @@ export class D3TreeDataDisplay {
 
     // Since descriptions of DataVerts can change, they are added out here
     data_vertices
-      .select('.' + data_vert_label_css_class)
       .select('.' + data_vert_label_name_css_class)
-      .text((d) => replaceNameIdParts(d.node.data.tree_id, d.key))
+      .text((d) => replaceNameIdParts(d.node.data.tree_ref, d.key))
     data_vertices
-      .select('.' + data_vert_label_css_class)
       .select('.' + data_vert_label_type_css_class)
       .text((d) => '(type: ' + prettyprint_type(d.type) + ')')
+
+    // Highlight terminals with duplicate display names
+    const display_name_set = new Map<UUIDString, Set<string>>()
+    const duplicate_set = new Map<UUIDString, Set<string>>()
+    data_vertices
+      .select('.' + data_vert_grip_css_class)
+      .each((d) => {
+        if (!display_name_set.has(d.node.data.node_id)) {
+          display_name_set.set(d.node.data.node_id, new Set<string>())
+        }
+        if (!duplicate_set.has(d.node.data.node_id)) {
+          duplicate_set.set(d.node.data.node_id, new Set<string>())
+        }
+        const text = replaceNameIdParts(d.node.data.tree_ref, d.key)
+        if (display_name_set.get(d.node.data.node_id)!.has(text)) {
+          duplicate_set.get(d.node.data.node_id)!.add(text)
+        } else {
+          display_name_set.get(d.node.data.node_id)!.add(text)
+        }
+      })
+      .classed(data_vert_duplicate_css_class, (d) => {
+        const text = replaceNameIdParts(d.node.data.tree_ref, d.key)
+        return duplicate_set.get(d.node.data.node_id)!.has(text)
+      })
 
     if (this.editable) {
       data_vertices

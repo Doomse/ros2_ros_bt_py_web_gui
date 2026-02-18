@@ -41,7 +41,7 @@ import * as d3 from 'd3'
 import type { HierarchyNode, HierarchyLink } from 'd3-hierarchy'
 import { flextree, type FlextreeNode } from 'd3-flextree'
 import * as uuid from 'uuid'
-import { replaceNameIdParts, rosToUuid } from '@/utils'
+import { rosToUuid } from '@/utils'
 import {
   tree_node_css_class,
   node_body_css_class,
@@ -60,7 +60,8 @@ import {
   node_inner_css_class,
   node_warn_css_class,
   node_button_css_class,
-  button_icon_size
+  button_icon_size,
+  nested_tree_scaling
 } from './draw_tree_config'
 import { findTree } from '../tree_selection'
 import { D3TreeDataDisplay, getDataVertOffsets } from './draw_tree_data'
@@ -136,11 +137,13 @@ function resetNodeBody(
 
   selection
     .selectChild<SVGTextElement>('.' + node_name_css_class)
+    .attr('dx', null)
     .selectChildren<SVGTSpanElement, never>('tspan')
     .remove()
 
   selection
     .selectChild<SVGTextElement>('.' + node_class_css_class)
+    .attr('dx', null)
     .selectChildren<SVGTSpanElement, never>('tspan')
     .remove()
 
@@ -204,18 +207,16 @@ function drawSubtrees(
       if (expanded_subtrees.has(node.data.tree_ref)) {
         const rect = this.getBBox()
         // Downscale and center subtree
-        return `translate(${rect.width / 2 / 2 + node_padding},${button_icon_size / 2}) scale(0.5)`
+        return `translate(${(rect.width * nested_tree_scaling) / 2 + node_padding},${
+          button_icon_size / 2
+        }) scale(${nested_tree_scaling})`
       } else {
         return null
       }
     })
 }
 
-function layoutText(
-  element: SVGGElement,
-  data: d3.HierarchyNode<BTEditorNode>,
-  offset: number
-): number {
+function layoutText(element: SVGGElement, data: d3.HierarchyNode<BTEditorNode>): number {
   // Track width of longest line and return that for box sizing
   let max_width: number = 0
 
@@ -228,8 +229,6 @@ function layoutText(
   const node_class = data.data.node_class
 
   let title_lines: number = 0
-
-  name_elem.attr('y', offset)
 
   // Find positions for potential line breaks
   let wrap_indices: number[] = [0]
@@ -276,7 +275,7 @@ function layoutText(
     title_lines += 1
   }
 
-  class_elem.attr('y', title_lines * node_name_height + offset)
+  class_elem.attr('y', title_lines * node_name_height)
 
   // Find positions for potential line breaks
   wrap_indices = [0]
@@ -353,6 +352,9 @@ function updateButton(
     .attr('x', node.data.offset.x + node.data.size.width / 2 - button_icon_size / 2)
     .attr('y', node.data.offset.y + vert_offset)
     .on('click.expand', (event) => {
+      if (event.ctrlKey) {
+        return // Do nothing if ctrl is pressed
+      }
       if (expanded_subtrees.has(node.data.tree_ref)) {
         editor_store.expanded_subtrees = editor_store.expanded_subtrees.filter(
           (val) => val !== node.data.tree_ref
@@ -380,21 +382,8 @@ function updateNodeBody(
   selection: d3.Selection<SVGGElement, d3.HierarchyNode<BTEditorNode>, SVGGElement, never>
 ) {
   selection.each(function (node) {
-    const input_set = new Set(
-      node.data.inputs.map((d) => replaceNameIdParts(node.data.tree_id, d.key))
-    )
-    const output_set = new Set(
-      node.data.outputs.map((d) => replaceNameIdParts(node.data.tree_id, d.key))
-    )
-    const has_duplicates =
-      input_set.size < node.data.inputs.length && output_set.size < node.data.outputs.length
-
-    d3.select(this)
-      .selectChild('.' + node_warn_css_class)
-      .text(has_duplicates ? 'Has duplicate IO names' : '')
-
     // Offset based on height of warning text
-    node.data.size.width = layoutText(this, node, has_duplicates ? 36 : 0)
+    node.data.size.width = layoutText(this, node)
   })
 
   // Get width and offset from text content
