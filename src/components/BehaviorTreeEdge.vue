@@ -34,8 +34,8 @@ import { useROSStore } from '@/stores/ros'
 import type { WireNodeDataRequest, WireNodeDataResponse } from '@/types/services/WireNodeData'
 import { notify } from '@kyvg/vue3-notification'
 import { computed } from 'vue'
-import type { WiringData } from '@/types/types'
-import { prettyprint_type, rosToUuid, prettyprint_value } from '@/utils'
+import type { NodeStructure, WiringData } from '@/types/types'
+import { prettyprint_type, rosToUuid, prettyprint_value, replaceNameIdParts } from '@/utils'
 import {
   findNodeInTreeList,
   findWiringInTreeList,
@@ -47,36 +47,62 @@ const ros_store = useROSStore()
 const editor_store = useEditorStore()
 const edit_node_store = useEditNodeStore()
 
-const source_name = computed<string>(() => {
+const source_node = computed<NodeStructure | undefined>(() => {
   if (editor_store.selected_edge === undefined) {
-    return ''
+    return
   }
-  const source_node = findNodeInTreeList(
+  return findNodeInTreeList(
     editor_store.tree_structure_list,
     getNodeStructures,
     editor_store.selected_edge_tree_id,
     rosToUuid(editor_store.selected_edge.source.node_id)
   )
-  if (source_node === undefined) {
-    return ''
-  }
-  return source_node.name
 })
 
-const target_name = computed<string>(() => {
+const source_name = computed<string>(() => {
+  if (source_node.value === undefined) {
+    return ''
+  }
+  return source_node.value.name
+})
+
+const source_key = computed<string>(() => {
   if (editor_store.selected_edge === undefined) {
     return ''
   }
-  const target_node = findNodeInTreeList(
+  if (source_node.value === undefined) {
+    return editor_store.selected_edge.source.data_key
+  }
+  return replaceNameIdParts(source_node.value.tree_ref, editor_store.selected_edge.source.data_key)
+})
+
+const target_node = computed<NodeStructure | undefined>(() => {
+  if (editor_store.selected_edge === undefined) {
+    return
+  }
+  return findNodeInTreeList(
     editor_store.tree_structure_list,
     getNodeStructures,
     editor_store.selected_edge_tree_id,
     rosToUuid(editor_store.selected_edge.target.node_id)
   )
-  if (target_node === undefined) {
+})
+
+const target_name = computed<string>(() => {
+  if (target_node.value === undefined) {
     return ''
   }
-  return target_node.name
+  return target_node.value.name
+})
+
+const target_key = computed<string>(() => {
+  if (editor_store.selected_edge === undefined) {
+    return ''
+  }
+  if (target_node.value === undefined) {
+    return editor_store.selected_edge.target.data_key
+  }
+  return replaceNameIdParts(target_node.value.tree_ref, editor_store.selected_edge.target.data_key)
 })
 
 const edge_data = computed<WiringData | undefined>(() => {
@@ -159,7 +185,7 @@ function selectTargetNode() {
         <button class="btn btn-outline-contrast" @click="() => selectSourceNode()">
           <span class="text-primary">{{ source_name }}</span
           ><br />
-          {{ editor_store.selected_edge!.source.data_key }}
+          {{ source_key }}
         </button>
       </div>
       <hr class="flex-fill connector" />
@@ -167,7 +193,7 @@ function selectTargetNode() {
         <button class="btn btn-outline-contrast" @click="() => selectTargetNode()">
           <span class="text-primary">{{ target_name }}</span
           ><br />
-          {{ editor_store.selected_edge!.target.data_key }}
+          {{ target_key }}
         </button>
       </div>
     </div>
