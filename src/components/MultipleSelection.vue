@@ -56,10 +56,11 @@ const show_selection_modal = ref<boolean>(false)
 
 const handle_name_conflict = ref<NameConflictHandler>(NameConflictHandler.ASK)
 
+// For convenience, this is also false if the selection is empty
 const all_in_main_tree = computed<boolean>(() => {
   return (
     edit_node_store.selected_node_id_pairs.find((id_pair) => id_pair.tree !== uuid.NIL) ===
-    undefined
+      undefined && edit_node_store.selected_node_id_pairs.length > 0
   )
 })
 
@@ -236,10 +237,16 @@ function saveSubtree(tree: TreeStructure) {
   <div class="d-flex flex-column">
     <div class="row g-2 mb-3">
       <div class="btn-group col-8">
-        <button class="btn btn-primary" @click="selectSubtreeSaveLocation">Select Location</button>
         <button
           class="btn btn-primary"
-          :disabled="storage_location === '' || file_path === '' || !all_in_main_tree"
+          :disabled="!all_in_main_tree"
+          @click="selectSubtreeSaveLocation"
+        >
+          Select Location
+        </button>
+        <button
+          class="btn btn-primary"
+          :disabled="storage_location === '' || file_path === ''"
           @click="generateSubtree"
         >
           Save Subtree

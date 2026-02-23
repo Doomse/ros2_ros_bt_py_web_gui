@@ -124,6 +124,16 @@ const pan_rate: number = 30
 const drag_pan_boundary: number = 50
 const pan_per_frame: number = 10.0
 
+function getTransformMatrixFromRoot(elem: SVGGraphicsElement): DOMMatrix {
+  let matrix = tree_root_ref.value!.getCTM()!.inverse().multiply(elem.getCTM()!)
+  // Undo local transforms
+  for (let index = 0; index < elem.transform.baseVal.length; index++) {
+    const local_transform = elem.transform.baseVal[index]
+    matrix = matrix.multiply(local_transform.matrix.inverse())
+  }
+  return matrix
+}
+
 function resetView() {
   if (
     viewport_ref.value === undefined ||
@@ -519,10 +529,7 @@ function highlightElem(elem: SVGGraphicsElement, target: 'v1' | 'v2' | 'e', onof
     .attr('id', onoff ? css_id : null)
 
   if (onoff) {
-    let matrix = tree_root_ref.value!.getCTM()!.inverse().multiply(elem.getCTM()!)
-    if (target === 'v1' || target === 'v2') {
-      matrix = matrix.multiply(elem.transform.baseVal.getItem(0)!.matrix.inverse())
-    }
+    const matrix = getTransformMatrixFromRoot(elem)
     const transform = highlight.transform.baseVal.createSVGTransformFromMatrix(matrix)
     highlight.transform.baseVal.initialize(transform)
   }
@@ -540,7 +547,7 @@ onMounted(() => {
   const viewport = d3.select(viewport_ref.value)
 
   zoomObject = d3.zoom<SVGSVGElement, unknown>()
-  zoomObject.scaleExtent([0.1, 10.0])
+  zoomObject.scaleExtent([0.3, 10.0])
 
   const container = d3.select<SVGGElement, never>(svg_g_ref.value)
 
@@ -601,30 +608,37 @@ onMounted(() => {
 
       const [x, y] = d3.pointer(event, svg_g_ref.value)
 
-      const new_x = Math.min(x, start_x)
-      const new_y = Math.min(y, start_y)
-      const width = Math.abs(x - start_x)
-      const height = Math.abs(y - start_y)
+      const x_min = Math.min(x, start_x)
+      const y_min = Math.min(y, start_y)
+      const x_max = Math.max(x, start_x)
+      const y_max = Math.max(y, start_y)
 
       // flip the selection rectangle if the user moves in a negative direction from the start point
-      sel_rect.attr('x', new_x).attr('y', new_y)
+      sel_rect.attr('x', x_min).attr('y', y_min)
 
-      sel_rect.attr('width', width).attr('height', height)
+      sel_rect.attr('width', x_max - x_min).attr('height', y_max - y_min)
 
       const temp_selected_nodes: BTEditorNode[] = []
 
       // Update which nodes are in the selection
       d3.select<SVGGElement, never>(svg_g_ref.value)
         .selectAll<SVGGElement, FlextreeNode<BTEditorNode>>('.' + tree_node_css_class)
-        .select<SVGRectElement>('.' + node_body_css_class)
-        .each((node: FlextreeNode<BTEditorNode>) => {
+        .each(function (node: FlextreeNode<BTEditorNode>) {
           // Select all nodes in the selection rectangle
           // Node coordinates are given for the top-center point
+          const matrix = getTransformMatrixFromRoot(this)
+          const top_left = new DOMPoint(node.x - node.data.size.width / 2, node.y).matrixTransform(
+            matrix
+          )
+          const bot_right = new DOMPoint(
+            node.x + node.data.size.width / 2,
+            node.y + node.data.size.height
+          ).matrixTransform(matrix)
           if (
-            node.x - node.data.size.width / 2 >= new_x &&
-            node.x + node.data.size.width / 2 <= new_x + width &&
-            node.y >= new_y &&
-            node.y + node.data.size.height <= new_y + height
+            top_left.x >= x_min &&
+            bot_right.x <= x_max &&
+            top_left.y >= y_min &&
+            bot_right.y <= y_max
           ) {
             temp_selected_nodes.push(node.data)
           }

@@ -267,7 +267,9 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     last_seletion_source.value = EditorSelectionSource.MULTIPLE
 
     selected_node_id_pairs.value.forEach((id_pair: TreeNodeIdPair) => {
-      const index = new_selected_node_id_pairs.indexOf(id_pair)
+      const index = new_selected_node_id_pairs.findIndex(
+        (val) => val.tree === id_pair.tree && val.node === id_pair.node
+      )
       if (index === -1) {
         new_selected_node_id_pairs.push(id_pair)
       } else {
