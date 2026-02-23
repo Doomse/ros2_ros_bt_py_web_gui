@@ -278,7 +278,7 @@ export class D3DropTargetDisplay {
         if (d.position === Position.ROOT) {
           return -drop_target_root_size / 2
         }
-        let x = d.node.x + d.node.data.offset.x
+        let x = d.node.x
         if (d.position === Position.RIGHT) {
           x += 0.5 * d.node.data.size.width
         } else {
@@ -293,7 +293,7 @@ export class D3DropTargetDisplay {
         if (d.position === Position.ROOT) {
           return -0.5 * node_spacing
         }
-        let y = d.node.y + d.node.data.offset.y
+        let y = d.node.y
         if (d.position === Position.TOP) {
           y -= 0.5 * node_spacing
         }

@@ -679,11 +679,17 @@ onMounted(() => {
       y: y - io_gripper_size / 2
     }
 
+    // Apply offsets from tree display
+    const other_endpoint: DataEdgePoint = {
+      x: editor_store.data_edge_endpoint.x + horizontal_tree_padding,
+      y: editor_store.data_edge_endpoint.y + vertical_tree_offset
+    }
+
     d3.select(draw_indicator_ref.value).attr('d', () => {
       if (editor_store.data_edge_endpoint!.kind === IOKind.INPUT) {
-        return drawDataLine(mouse_point, editor_store.data_edge_endpoint!)
+        return drawDataLine(mouse_point, other_endpoint)
       } else {
-        return drawDataLine(editor_store.data_edge_endpoint!, mouse_point)
+        return drawDataLine(other_endpoint, mouse_point)
       }
     })
   })

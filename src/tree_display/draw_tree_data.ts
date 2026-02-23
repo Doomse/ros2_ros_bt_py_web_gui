@@ -611,7 +611,5 @@ export class D3TreeDataDisplay {
       .selectChildren<SVGGElement, DataEdgeTerminal>('.' + data_vert_group_css_class)
       .filter((term: DataEdgeTerminal) => typesCompatible(term, other_endpoint))
       .classed(data_graph_comaptible_css_class, true)
-
-    d3.select(this.draw_indicator).attr('d', () => drawDataLine(other_endpoint, other_endpoint))
   }
 }
