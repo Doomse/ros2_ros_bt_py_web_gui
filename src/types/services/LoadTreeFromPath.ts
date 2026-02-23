@@ -36,4 +36,5 @@ export type LoadTreeFromPathRequest = {
 export type LoadTreeFromPathResponse = {
   success: boolean
   error_message: string
+  actual_path: string
 }

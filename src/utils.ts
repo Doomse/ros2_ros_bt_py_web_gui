@@ -388,3 +388,25 @@ export function parseConflictHandler(handler: NameConflictHandler): [boolean, bo
   }
   return [allow_overwrite, allow_rename]
 }
+
+const treatable_error_prefixes: string[] = [
+  'Expected data to be of type type, got dict instead. Looks like failed jsonpickle decode,',
+  'AttributeError, maybe a ROS Message definition changed.'
+]
+
+export function isLoadErrorTreatable(error: string) {
+  let treatable = false
+  treatable_error_prefixes.forEach((val) => {
+    if (error.startsWith(val)) {
+      treatable = true
+    }
+  })
+  return treatable
+}
+
+export function notifyLoadMigration(actual_path: string) {
+  window.alert(
+    `We had to run migrations on the tree file you tried to load.
+    The updated version can be found at "${actual_path}" and it is currently loaded.`
+  )
+}

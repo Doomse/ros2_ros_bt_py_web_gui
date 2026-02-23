@@ -43,6 +43,7 @@ import {
   type ControlTreeExecutionResponse
 } from '@/types/services/ControlTreeExecution'
 import { findTree } from '@/tree_selection'
+import { isLoadErrorTreatable, notifyLoadMigration } from '@/utils'
 
 const ros_store = useROSStore()
 const editor_store = useEditorStore()
@@ -95,68 +96,66 @@ function loadTreeMsg(msg: TreeStructure) {
           title: 'Loaded tree successfully!',
           type: 'success'
         })
+        if (response.actual_path !== '' && msg.path !== response.actual_path) {
+          notifyLoadMigration(response.actual_path)
+        }
         editor_store.resetQuickSaveLocation()
       } else {
+        notify({
+          title: 'Error while calling LoadTree service!',
+          text: response.error_message,
+          type: 'warn'
+        })
+
+        if (!isLoadErrorTreatable(response.error_message)) {
+          return
+        }
+
         if (
-          response.error_message.startsWith(
-            'Expected data to be of type type, got dict instead. Looks like failed jsonpickle decode,'
-          ) ||
-          response.error_message.startsWith(
-            'AttributeError, maybe a ROS Message definition changed.'
+          !window.confirm(
+            'The tree you want to load seems to have nodes with invalid options, do you want to load it in permissive mode? WARNING: this will probably change some option values!'
           )
         ) {
           notify({
-            title: 'Loaded tree has invalid input/output/option typings!',
+            title: 'Error while calling LoadTree service!',
+            text: 'Loading in permissive mode was rejected.',
             type: 'warn'
           })
-          if (
-            window.confirm(
-              'The tree you want to load seems to have nodes with invalid options, do you want to load it in permissive mode? WARNING: this will probably change some option values!'
-            )
-          ) {
-            if (ros_store.load_tree_service === undefined) {
-              notify({
-                title: 'Service is unavailable!',
-                text: 'LoadTree service is not connected!',
-                type: 'error'
-              })
-              return
-            }
-            ros_store.load_tree_service.callService(
-              {
-                tree: msg,
-                permissive: true
-              } as LoadTreeRequest,
-              (response: LoadTreeResponse) => {
-                if (response.success) {
-                  notify({
-                    title: 'Loaded tree successfully!',
-                    type: 'success'
-                  })
-                  editor_store.resetQuickSaveLocation()
-                } else {
-                  notify({
-                    title: 'Failed to load tree!',
-                    text: response.error_message,
-                    type: 'warn'
-                  })
-                }
-              },
-              (failed: string) => {
-                notify({
-                  title: 'Failed to call load tree service!',
-                  text: failed,
-                  type: 'error'
-                })
-              }
-            )
-          }
+          return
         }
-        notify({
-          title: 'Failed to load tree!',
-          text: response.error_message,
-          type: 'error'
-        })
+
+        ros_store.load_tree_service.callService(
+          {
+            tree: msg,
+            permissive: true
+          } as LoadTreeRequest,
+          (response: LoadTreeResponse) => {
+            if (response.success) {
+              notify({
+                title: 'Loaded tree successfully!',
+                text: 'Permissive mode might not completely restore the tree',
+                type: 'success'
+              })
+              if (response.actual_path !== '' && msg.path !== response.actual_path) {
+                notifyLoadMigration(response.actual_path)
+              }
+              editor_store.resetQuickSaveLocation()
+            } else {
+              notify({
+                title: 'Failed to load tree!',
+                text: response.error_message,
+                type: 'warn'
+              })
+            }
+          },
+          (failed: string) => {
+            notify({
+              title: 'Failed to call load tree service!',
+              text: failed,
+              type: 'error'
+            })
+          }
+        )
       }
     },
     (failed: string) => {

@@ -38,6 +38,7 @@ import type {
 } from '@/types/services/LoadTreeFromPath'
 import { notify } from '@kyvg/vue3-notification'
 import { useEditorStore } from '@/stores/editor'
+import { isLoadErrorTreatable, notifyLoadMigration } from '@/utils'
 
 const props = defineProps<{
   fromPackages: boolean
@@ -49,8 +50,6 @@ const emit = defineEmits<{
 
 const editor_store = useEditorStore()
 const ros_store = useROSStore()
-
-const treatable_errors: string[] = []
 
 // Specify valid file extensions as regex (multiple with | in the capture group)
 const file_type_regex: RegExp = /\.(yaml)$/
@@ -90,9 +89,12 @@ function loadTree() {
       if (response.success) {
         notify({
           title: 'Successfully loaded tree!',
-          text: file_path.value,
+          text: response.actual_path,
           type: 'success'
         })
+        if (file_path.value !== response.actual_path) {
+          notifyLoadMigration(response.actual_path)
+        }
         editor_store.resetQuickSaveLocation()
         emit('close')
       } else {
@@ -102,7 +104,7 @@ function loadTree() {
           type: 'warn'
         })
 
-        if (!treatable_errors.includes(response.error_message)) {
+        if (!isLoadErrorTreatable(response.error_message)) {
           return
         }
 
@@ -128,9 +130,12 @@ function loadTree() {
             if (response.success) {
               notify({
                 title: 'Successfully loaded tree in permissive mode!',
-                text: file_path.value,
+                text: response.actual_path,
                 type: 'success'
               })
+              if (file_path.value !== response.actual_path) {
+                notifyLoadMigration(response.actual_path)
+              }
               editor_store.resetQuickSaveLocation()
               emit('close')
             } else {
