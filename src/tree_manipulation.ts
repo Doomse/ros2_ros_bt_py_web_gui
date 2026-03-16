@@ -34,32 +34,13 @@ import type { MoveNodeRequest, MoveNodeResponse } from './types/services/MoveNod
 import type { RemoveNodeRequest, RemoveNodeResponse } from './types/services/RemoveNode'
 import type { ReplaceNodeRequest, ReplaceNodeResponse } from './types/services/ReplaceNode'
 import type { WireNodeDataRequest, WireNodeDataResponse } from './types/services/WireNodeData'
-import type {
-  UUIDString,
-  NodeStructure,
-  DataEdgeTerminal,
-  Wiring,
-  DocumentedNode,
-  NodeOption,
-  OptionData
-} from './types/types'
-import {
-  getDefaultValue,
-  prettyprint_type,
-  rosToUuid,
-  serializeNodeOptions,
-  uuidToRos
-} from './utils'
+import type { UUIDString, NodeStructure, DocumentedNode } from './types/types'
+import { rosToUuid, uuidToRos } from './utils'
 import { notify } from '@kyvg/vue3-notification'
+import type { DataEdgeTerminal } from './types/editor_types'
+import type { Wiring } from './types/data_types'
 
 export function buildDefaultNodeMessage(node: DocumentedNode): NodeStructure {
-  const options = node.options.map((opt: NodeOption) => {
-    return {
-      key: opt.key,
-      value: getDefaultValue(prettyprint_type(opt.serialized_type), node.options)
-    } as OptionData
-  })
-
   return {
     node_id: uuidToRos(uuid.v4()),
     name: node.node_class,
@@ -68,9 +49,8 @@ export function buildDefaultNodeMessage(node: DocumentedNode): NodeStructure {
     version: '',
     max_children: 0,
     child_ids: [],
-    options: serializeNodeOptions(options),
-    inputs: [],
-    outputs: [],
+    inputs: node.inputs,
+    outputs: node.outputs,
     tree_ref: ''
   }
 }

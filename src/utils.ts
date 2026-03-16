@@ -28,30 +28,48 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 import * as uuid from 'uuid'
-import {
-  getPythonTypeDefault,
-  isPythonTypeWithDefault,
-  TypeWrapper_Name,
-  type TypeWrapper
-} from './types/python_types'
-import type {
-  DataEdgeTerminal,
-  OptionData,
-  ParamType,
-  NodeOption,
-  TreeState,
-  UUIDMsg,
-  UUIDString,
-  RosTime,
-  PyB64,
-  Wiring
-} from './types/types'
-import { IOKind } from './types/types'
+import type { UUIDMsg, UUIDString, RosTime } from './types/types'
 import { findNodeInTreeList, getNodeStructures } from './tree_selection'
 import { useEditorStore } from './stores/editor'
+import { DataTypeValues, type NodeDataType, type Wiring } from './types/data_types'
+import type { DataEdgeTerminal } from './types/editor_types'
+import {
+  BoolType,
+  BytesType,
+  DictType,
+  FloatType,
+  IntType,
+  ListType,
+  PathType,
+  StringType,
+  type DataType
+} from './types/data_classes'
 
 export function parseRosTime(time: RosTime): Date {
   return new Date(time.sec * 1000 + time.nanosec / 1000000)
+}
+
+export function getTypeFromMsg(type_msg: NodeDataType): DataType {
+  switch (type_msg.type_identifier) {
+    case DataTypeValues.BOOL_TYPE:
+      return new BoolType(type_msg)
+    case DataTypeValues.INT_TYPE:
+      return new IntType(type_msg)
+    case DataTypeValues.FLOAT_TYPE:
+      return new FloatType(type_msg)
+    case DataTypeValues.STRING_TYPE:
+      return new StringType(type_msg)
+    case DataTypeValues.PATH_TYPE:
+      return new PathType(type_msg)
+    case DataTypeValues.BYTES_TYPE:
+      return new BytesType(type_msg)
+    case DataTypeValues.LIST_TYPE:
+      return new ListType(type_msg)
+    case DataTypeValues.DICT_TYPE:
+      return new DictType(type_msg)
+    default:
+      throw Error(`Unrecognized data type ${type_msg}`)
+  }
 }
 
 export function rosToUuid(msg: UUIDMsg): UUIDString {
@@ -95,248 +113,18 @@ export function replaceNameIdParts(tree_id: UUIDString, name_id_parts: string): 
 export function compareWirings(w1: Wiring, w2: Wiring): boolean {
   return (
     compareRosUuid(w1.source.node_id, w2.source.node_id) &&
-    w1.source.data_kind === w2.source.data_kind &&
     w1.source.data_key === w2.source.data_key &&
     compareRosUuid(w1.target.node_id, w2.target.node_id) &&
-    w1.target.data_kind === w2.target.data_kind &&
     w1.target.data_key === w2.target.data_key
   )
 }
 
-export function typesCompatible(a: DataEdgeTerminal, b: DataEdgeTerminal) {
-  if (a.node.data.node_id === b.node.data.node_id) {
+export function typesCompatible(source: DataEdgeTerminal, target: DataEdgeTerminal) {
+  if (source.node.data.node_id === target.node.data.node_id) {
     return false
   }
 
-  if (a.kind === b.kind) {
-    return false
-  }
-
-  const from = a.kind === IOKind.OUTPUT ? a : b
-  const to = a.kind === IOKind.INPUT ? a : b
-
-  // object is compatible with anything
-  if (
-    to.type === '{"py/type": "__builtin__.object"}' ||
-    to.type === '{"py/type": "builtins.object"}'
-  ) {
-    return true
-  }
-
-  return prettyprint_type(from.type) === prettyprint_type(to.type)
-}
-
-export const python_builtin_types = [
-  'int',
-  'float',
-  'str',
-  'bytes',
-  'bool',
-  'list',
-  'dict',
-  'set',
-  'type' //TODO Is this reasonable to allow?
-]
-
-export function hexToPyB64(hex_s: string): PyB64 {
-  // If length is odd, prepend a zero
-  if (hex_s.length % 2 != 0) {
-    hex_s = '0' + hex_s
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const arr = (Uint8Array as any).fromHex(hex_s)
-  return { 'py/b64': arr.toBase64() }
-}
-
-export function pyB64ToHex(py_b64: PyB64): string {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const arr = (Uint8Array as any).fromBase64(py_b64['py/b64'])
-  return arr.toHex()
-}
-
-export function prettyprint_type(jsonpickled_type: string): string {
-  const json_type = JSON.parse(jsonpickled_type)
-  if (json_type['py/type'] !== undefined) {
-    // shorten the CapabilityType
-    if (json_type['py/type'] === 'bt_capabilities.nodes.capability.CapabilityType') {
-      return 'CapabilityType'
-    }
-    // Remove the "builtin" prefix jsonpickle adds
-    return json_type['py/type']
-      .replace('__builtin__.', '')
-      .replace('builtins.', '')
-      .replace(/^basestring$/, 'str')
-      .replace(/^unicode$/, 'str')
-  }
-
-  // If the type doesn't have a py/type field, maybe it's an
-  // OptionRef?
-  if (
-    json_type['py/object'] !== undefined &&
-    json_type['py/object'] === 'ros_bt_py.node_config.OptionRef'
-  ) {
-    return 'OptionRef(' + json_type['option_key'] + ')'
-  }
-
-  // Fully hide HintedType, the Typeparam recovers hints on its own
-  if (json_type['py/object'] !== undefined && json_type['py/object'] === TypeWrapper_Name) {
-    const wrapper = json_type as TypeWrapper
-    return prettyprint_type(JSON.stringify(wrapper.actual_type)) + '(' + wrapper.info + ')'
-  }
-
-  if (
-    json_type['py/reduce'] !== undefined &&
-    json_type['py/reduce'][0] !== undefined &&
-    json_type['py/reduce'][0]['py/type'] !== undefined &&
-    json_type['py/reduce'][0]['py/type'] === 'collections.OrderedDict'
-  ) {
-    return json_type['py/reduce'][0]['py/type']
-  }
-
-  return 'Unknown type object: ' + jsonpickled_type
-}
-
-export function prettyprint_value(jsonpickle: string): string {
-  const json_value = JSON.parse(jsonpickle)
-  if (json_value['py/b64'] !== undefined) {
-    return '0x' + pyB64ToHex(json_value)
-  }
-  return json_value
-}
-
-export function getTypeAndInfo(typeStr: string): [string, string] {
-  let match
-  if (typeStr.startsWith('OptionRef(')) {
-    match = typeStr.match(/(.*\(.*\))\((.*)\)/)
-  } else {
-    match = typeStr.match(/(.*)\((.*)\)/)
-  }
-  if (match === null) {
-    return [typeStr, '']
-  }
-  return [match[1], match[2]]
-}
-
-export const unset_ref_str = 'unset_optionref'
-
-export function parseOptionRef(typeStr: string, options: NodeOption[] | null = null): string {
-  if (typeStr.startsWith('OptionRef(')) {
-    const optionTypeName = typeStr.substring('OptionRef('.length, typeStr.length - 1)
-    if (options === null) {
-      return unset_ref_str
-    }
-    const optionType = options.find((x) => {
-      return x.key === optionTypeName
-    })
-    if (optionType) {
-      if (optionType.serialized_value === '') {
-        return getDefaultValue(prettyprint_type(optionType.serialized_type)).value as string
-      }
-      return prettyprint_type(optionType.serialized_value)
-    } else {
-      return unset_ref_str
-    }
-  } else {
-    return typeStr
-  }
-}
-
-export function getDefaultValue(typeStr: string, options: NodeOption[] | null = null): ParamType {
-  const typeName = getTypeAndInfo(typeStr)[0]
-  if (typeName === 'type') {
-    return {
-      type: typeStr,
-      value: 'int'
-    }
-  } else if (typeName === 'int') {
-    return {
-      type: typeStr,
-      value: 0
-    }
-  } else if (typeName === 'str') {
-    return {
-      type: typeStr,
-      value: 'foo'
-    }
-  } else if (typeName === 'bytes') {
-    return {
-      type: typeStr,
-      value: hexToPyB64('00')
-    }
-  } else if (typeName === 'float') {
-    return {
-      type: typeStr,
-      value: 1.2
-    }
-  } else if (typeName === 'bool') {
-    return {
-      type: typeStr,
-      value: true
-    }
-  } else if (typeName === 'list') {
-    return {
-      type: typeStr,
-      value: []
-    }
-  } else if (typeName === 'dict') {
-    return {
-      type: typeStr,
-      value: {}
-    }
-  } else if (typeName.startsWith('OptionRef(')) {
-    const refStr = parseOptionRef(typeName, options)
-    if (refStr === unset_ref_str) {
-      const optionTypeName = typeName.substring('OptionRef('.length, typeName.length - 1)
-      return {
-        type: unset_ref_str,
-        value: 'Ref to "' + optionTypeName + '"'
-      }
-    }
-    return getDefaultValue(refStr, options)
-    // This checks all types defined in `python_types`
-    // which provide default values
-  } else if (isPythonTypeWithDefault(typeName)) {
-    return {
-      type: typeStr,
-      value: getPythonTypeDefault(typeName) || {}
-    }
-  } else {
-    return {
-      type: '__' + typeStr,
-      value: {}
-    }
-  }
-}
-
-export function serializeNodeOptions(node_options: OptionData[]): NodeOption[] {
-  return node_options.map((x) => {
-    const option: NodeOption = {
-      key: x.key,
-      serialized_value: '',
-      serialized_type: '' // This is left blank intentionally
-    }
-    if (x.value.type.startsWith('type')) {
-      if (python_builtin_types.indexOf(x.value.value as string) >= 0) {
-        x.value.value = 'builtins.' + x.value.value
-      }
-      option.serialized_value = JSON.stringify({
-        'py/type': x.value.value
-      })
-    } else {
-      option.serialized_value = JSON.stringify(x.value.value)
-    }
-    return option
-  })
-}
-
-// Get the distance between two sets of coordinates (expected to be
-// arrays with 2 elements each)
-export function getDist(a: number[], b: number[]) {
-  return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2))
-}
-
-export function treeIsEditable(tree_msg: TreeState) {
-  return tree_msg.state === 'EDITABLE'
+  return source.type.isCompatible(target.type)
 }
 
 export function getShortDoc(doc: string) {

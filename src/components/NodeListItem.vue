@@ -132,11 +132,6 @@ function onClick() {
           </div>
         </div>
         <IOTableEntry
-          v-if="node.options.length > 0"
-          title="Options"
-          :io_node_data="node.options"
-        ></IOTableEntry>
-        <IOTableEntry
           v-if="node.inputs.length > 0"
           title="Inputs"
           :io_node_data="node.inputs"

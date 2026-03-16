@@ -29,17 +29,12 @@
  */
 import * as d3 from 'd3'
 import * as uuid from 'uuid'
-import {
-  Position,
-  type BTEditorNode,
-  type DocumentedNode,
-  type DropTarget,
-  type UUIDString
-} from '@/types/types'
+import type { DocumentedNode, UUIDString } from '@/types/types'
 import type { FlextreeNode } from 'd3-flextree'
 import { drop_target_css_class, drop_target_root_size, node_spacing } from './draw_tree_config'
 import { useEditorStore } from '@/stores/editor'
 import { moveNode, replaceNode, buildDefaultNodeMessage, addNode } from '@/tree_manipulation'
+import { type DropTarget, Position, type BTEditorNode } from '@/types/editor_types'
 
 async function moveExistingNode(drop_target: DropTarget) {
   const editor_store = useEditorStore()

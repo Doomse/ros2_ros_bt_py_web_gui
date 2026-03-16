@@ -34,14 +34,15 @@ import { useROSStore } from '@/stores/ros'
 import type { WireNodeDataRequest, WireNodeDataResponse } from '@/types/services/WireNodeData'
 import { notify } from '@kyvg/vue3-notification'
 import { computed } from 'vue'
-import type { NodeStructure, WiringData } from '@/types/types'
-import { prettyprint_type, rosToUuid, prettyprint_value, replaceNameIdParts } from '@/utils'
+import type { NodeStructure } from '@/types/types'
+import { rosToUuid, replaceNameIdParts } from '@/utils'
 import {
   findNodeInTreeList,
   findWiringInTreeList,
   getNodeStructures,
   getWiringData
 } from '@/tree_selection'
+import type { WiringData } from '@/types/data_types'
 
 const ros_store = useROSStore()
 const editor_store = useEditorStore()
@@ -198,11 +199,11 @@ function selectTargetNode() {
       </div>
     </div>
     <div v-if="edge_data !== undefined" class="mx-auto text-center">
-      Value: {{ prettyprint_value(edge_data.serialized_data) }}
+      Value: {{ edge_data.serialized_data }}
       <br />
-      of type: {{ prettyprint_type(edge_data.serialized_type) }}
+      of type: {{ edge_data.serialized_type }}
       <br />
-      expected type: {{ prettyprint_type(edge_data.serialized_expected_type) }}
+      expected type: {{ edge_data.serialized_expected_type }}
     </div>
   </div>
 </template>

@@ -28,16 +28,27 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  -->
 <script setup lang="ts">
-import type { NodeIO } from '@/types/types'
-import { prettyprint_type } from '@/utils'
-import { ref } from 'vue'
+import type { NodeIO } from '@/types/data_types'
+import type { NodeData } from '@/types/editor_types'
+import { getTypeFromMsg } from '@/utils'
+import { computed, ref } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   io_node_data: NodeIO[]
   title: string
 }>()
 
 const show_details = ref<boolean>(true)
+
+const node_data = computed<NodeData[]>(() => {
+  return props.io_node_data.map((x) => {
+    return {
+      key: x.key,
+      type: getTypeFromMsg(x.type),
+      serialized_value: x.serialized_value
+    }
+  })
+})
 </script>
 
 <template>
@@ -52,12 +63,12 @@ const show_details = ref<boolean>(true)
       />
     </div>
     <template v-if="show_details">
-      <template v-for="node_data in io_node_data" :key="title + node_data.key">
+      <template v-for="data_item in node_data" :key="title + data_item.key">
         <div class="text-truncate">
-          {{ node_data.key }}
+          {{ data_item.key }}
         </div>
         <div class="text-truncate text-muted ms-2 mb-2">
-          {{ prettyprint_type(node_data.serialized_type) }}
+          {{ data_item.type.prettyprint() }}
         </div>
       </template>
     </template>

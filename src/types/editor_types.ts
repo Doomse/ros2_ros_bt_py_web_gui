@@ -27,36 +27,90 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-import eslint from '@eslint/js'
-import eslintConfigPrettier from 'eslint-config-prettier'
-import eslintPluginVue from 'eslint-plugin-vue'
-import globals from 'globals'
-import typescriptEslint from 'typescript-eslint'
 
-export default typescriptEslint.config(
-  {
-    extends: [
-      eslint.configs.recommended,
-      ...typescriptEslint.configs.recommended,
-      ...eslintPluginVue.configs['flat/recommended']
-    ],
+import type { FlextreeNode } from 'd3-flextree'
+import type { Wiring } from './data_types'
+import type { UUIDString, NodeStateValues } from './types'
+import type { DataType } from './data_classes'
 
-    files: ['src/**/*.vue', 'src/**/*.[tj]{s,sx}', 'src/**/*.[mc][tj]s'],
+export const enum IOKind {
+  INPUT,
+  OUTPUT
+}
 
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: globals.browser,
-      parserOptions: {
-        parser: typescriptEslint.parser
-      }
-    },
+export type DataEdgePoint = {
+  x: number
+  y: number
+}
 
-    rules: {
-      'no-fallthrough': 'warn',
-      'vue/require-v-for-key': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn'
-    }
-  },
-  eslintConfigPrettier
-)
+export type IdentifiedDataEdgePoint = DataEdgePoint & {
+  tree_id: UUIDString
+  node_id: UUIDString
+  key: string
+  kind: IOKind
+}
+
+export type DataEdgeTerminal = DataEdgePoint & {
+  node: FlextreeNode<BTEditorNode>
+  index: number
+  key: string
+  type: DataType
+  kind: IOKind
+}
+
+export type IdentifiedDataEdge = {
+  p1: IdentifiedDataEdgePoint
+  p2: IdentifiedDataEdgePoint
+  key: string
+}
+
+export type DataEdge = {
+  source: DataEdgeTerminal
+  target: DataEdgeTerminal
+  wiring: Wiring
+}
+
+export type DropTarget = {
+  node: FlextreeNode<BTEditorNode>
+  position: Position
+}
+
+export const enum Position {
+  TOP = 'top',
+  BOTTOM = 'bottom',
+  LEFT = 'left',
+  RIGHT = 'right',
+  CENTER = 'center',
+  ROOT = 'root'
+}
+
+export type NodeData = {
+  key: string
+  type: DataType
+  serialized_value: string
+}
+
+export type BTEditorNode = {
+  node_id: UUIDString
+  name: string
+
+  node_class: string
+  module: string
+
+  max_children: number
+  child_ids: UUIDString[]
+
+  inputs: NodeData[]
+  outputs: NodeData[]
+
+  // Reference to contained tree, if at all
+  tree_ref: UUIDString | ''
+
+  // Reference to own tree for global identification
+  tree_id: UUIDString
+
+  size: { width: number; height: number }
+  offset: { x: number; y: number }
+
+  state?: NodeStateValues
+}

@@ -28,42 +28,21 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-import type {
-  DocumentedNode,
-  IOData,
-  NodeIO,
-  NodeOption,
-  NodeStructure,
-  OptionData,
-  UUIDString,
-  ValueTypes
-} from '@/types/types'
+import type { DocumentedNode, NodeStructure, UUIDString } from '@/types/types'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as uuid from 'uuid'
 import { useEditorStore } from './editor'
 import { useNodesStore } from './nodes'
-import {
-  getDefaultValue,
-  parseOptionRef,
-  prettyprint_type,
-  serializeNodeOptions,
-  uuidToRos
-} from '@/utils'
+import { getTypeFromMsg, uuidToRos } from '@/utils'
 import { findNodeInTreeList, getNodeStructures } from '@/tree_selection'
+import type { NodeData } from '@/types/editor_types'
 
 export enum EditorSelectionSource {
   NONE = 'none',
   NODELIST = 'nodelist',
   EDITOR = 'editor',
   MULTIPLE = 'multiple'
-}
-
-function parseNodeIO(data: NodeIO, options?: NodeOption[] | null): IOData {
-  return {
-    key: data.key,
-    type: parseOptionRef(prettyprint_type(data.serialized_type), options)
-  } as IOData
 }
 
 type TreeNodeIdPair = {
@@ -86,9 +65,8 @@ export const useEditNodeStore = defineStore('edit_node', () => {
   const new_node_name = ref<string>('')
   const new_node_class = ref<string>('')
   const new_node_module = ref<string>('')
-  const new_node_options = ref<OptionData[]>([])
-  const new_node_inputs = ref<IOData[]>([])
-  const new_node_outputs = ref<IOData[]>([])
+  const new_node_inputs = ref<NodeData[]>([])
+  const new_node_outputs = ref<NodeData[]>([])
   const node_is_valid = ref<boolean>(false)
   const node_is_morphed = ref<boolean>(false)
 
@@ -159,18 +137,20 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     node_is_valid.value = true
     node_is_morphed.value = false
 
-    new_node_options.value = new_selected_node.options.map((data) => {
+    new_node_inputs.value = new_selected_node.inputs.map((input) => {
       return {
-        key: data.key,
-        value: getDefaultValue(prettyprint_type(data.serialized_type), new_selected_node.options)
-      } as OptionData
+        key: input.key,
+        type: getTypeFromMsg(input.type),
+        serialized_value: input.serialized_value
+      }
     })
-    new_node_inputs.value = new_selected_node.inputs.map((data) =>
-      parseNodeIO(data, new_selected_node.options)
-    )
-    new_node_outputs.value = new_selected_node.outputs.map((data) =>
-      parseNodeIO(data, new_selected_node.options)
-    )
+    new_node_outputs.value = new_selected_node.outputs.map((output) => {
+      return {
+        key: output.key,
+        type: getTypeFromMsg(output.type),
+        serialized_value: output.serialized_value
+      }
+    })
   }
 
   function editorSelectionChange(
@@ -229,26 +209,20 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     node_is_valid.value = true
     node_is_morphed.value = false
 
-    new_node_options.value = new_selected_node.options.map((data) => {
-      const type = prettyprint_type(data.serialized_type)
-      let json_value = JSON.parse(data.serialized_value)
-      if (type.startsWith('type')) {
-        json_value = prettyprint_type(data.serialized_value)
-      }
+    new_node_inputs.value = new_selected_node.inputs.map((input) => {
       return {
-        key: data.key,
-        value: {
-          type: type,
-          value: json_value
-        }
-      } as OptionData
+        key: input.key,
+        type: getTypeFromMsg(input.type),
+        serialized_value: input.serialized_value
+      }
     })
-    new_node_inputs.value = new_selected_node.inputs.map((data) =>
-      parseNodeIO(data, new_selected_node.options)
-    )
-    new_node_outputs.value = new_selected_node.outputs.map((data) =>
-      parseNodeIO(data, new_selected_node.options)
-    )
+    new_node_outputs.value = new_selected_node.outputs.map((output) => {
+      return {
+        key: output.key,
+        type: getTypeFromMsg(output.type),
+        serialized_value: output.serialized_value
+      }
+    })
   }
 
   function selectMultipleNodes(new_selected_node_id_pairs: TreeNodeIdPair[]) {
@@ -306,119 +280,23 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     new_node_class.value = new_reference_node.node_class
     new_node_module.value = new_reference_node.module
 
-    new_node_options.value = new_reference_node.options.map((data) => {
+    new_node_inputs.value = new_reference_node.inputs.map((input) => {
       return {
-        key: data.key,
-        value: getDefaultValue(prettyprint_type(data.serialized_type), new_reference_node.options)
-      } as OptionData
+        key: input.key,
+        type: getTypeFromMsg(input.type),
+        serialized_value: input.serialized_value
+      }
     })
-    new_node_inputs.value = new_reference_node.inputs.map((x) =>
-      parseNodeIO(x, new_reference_node.options)
-    )
-    new_node_outputs.value = new_reference_node.outputs.map((x) =>
-      parseNodeIO(x, new_reference_node.options)
-    )
+    new_node_outputs.value = new_reference_node.outputs.map((output) => {
+      return {
+        key: output.key,
+        type: getTypeFromMsg(output.type),
+        serialized_value: output.serialized_value
+      }
+    })
 
     node_has_changed.value = true
     node_is_morphed.value = true
-  }
-
-  function updateParamValue(paramType: 'options', key: string, new_value: ValueTypes) {
-    node_has_changed.value = true
-    function map_fun(x: OptionData): OptionData {
-      if (x.key === key) {
-        return {
-          key: key,
-          value: {
-            type: x.value.type,
-            value: new_value
-          }
-        }
-      } else {
-        return x
-      }
-    }
-
-    if (paramType === 'options') {
-      if (reference_node.value === undefined) {
-        console.error('Cannot recover node information')
-        return
-      }
-
-      // All of these are lists containing lists of [key, ref_key]
-      // That is, if options = { foo : int, bar : OptionRef(foo) }
-      // ref_keys will be [[bar, foo]]
-      function findOptionRefs(ref_list: NodeIO[]): [string, string][] {
-        return ref_list
-          .filter((x) => prettyprint_type(x.serialized_type).startsWith('OptionRef('))
-          .map((x): [string, string] => [
-            x.key,
-            prettyprint_type(x.serialized_type).substring(
-              'OptionRef('.length,
-              prettyprint_type(x.serialized_type).length - 1
-            )
-          ])
-          .filter((x) => x[1] === key)
-      }
-
-      const option_ref_keys = findOptionRefs(reference_node.value.options)
-
-      const input_ref_keys = findOptionRefs(reference_node.value.inputs)
-
-      const output_ref_keys = findOptionRefs(reference_node.value.outputs)
-
-      new_node_options.value = new_node_options.value.map(map_fun)
-      function resolve_refs(refs: [string, string][], current_item: OptionData): OptionData {
-        // See if the current option references the changed key
-        const refData = refs.find((ref) => ref[0] === current_item.key)!
-        if (refData) {
-          // If it does, find the type of the referred key
-          const optionType = new_node_options.value.find((opt) => opt.key === refData[1])
-          if (optionType) {
-            const opt_value = optionType.value.value as string
-            // Get a default value for the type indicated by the
-            // referenced option
-            return {
-              key: current_item.key,
-              value: getDefaultValue(opt_value)
-            }
-          }
-        }
-        return current_item
-      }
-      new_node_options.value = new_node_options.value.map((item) =>
-        resolve_refs(option_ref_keys, item)
-      )
-
-      function resolve_io_refs(refs: [string, string][], current_item: IOData): IOData {
-        // See if the current option references the changed key
-        const refData = refs.find((ref) => ref[0] === current_item.key)!
-        if (refData) {
-          // If it does, find the type of the referred key
-          const optionType = new_node_options.value.find((opt) => opt.key === refData[1])
-          if (optionType) {
-            const opt_value = optionType.value.value as string
-            // Get a default value for the type indicated by the
-            // referenced option
-            return {
-              key: current_item.key,
-              type: opt_value
-            }
-          }
-        }
-        return current_item
-      }
-      if (input_ref_keys.length > 0) {
-        new_node_inputs.value = new_node_inputs.value.map((item) =>
-          resolve_io_refs(input_ref_keys, item)
-        )
-      }
-      if (output_ref_keys.length > 0) {
-        new_node_outputs.value = new_node_outputs.value.map((item) =>
-          resolve_io_refs(output_ref_keys, item)
-        )
-      }
-    }
   }
 
   function buildNodeMsg(): NodeStructure {
@@ -430,9 +308,20 @@ export const useEditNodeStore = defineStore('edit_node', () => {
       version: '',
       max_children: 0,
       child_ids: [],
-      options: serializeNodeOptions(new_node_options.value),
-      inputs: [],
-      outputs: [],
+      inputs: new_node_inputs.value.map((input) => {
+        return {
+          key: input.key,
+          type: input.type.toTypeMsg(),
+          serialized_value: input.serialized_value
+        }
+      }),
+      outputs: new_node_outputs.value.map((output) => {
+        return {
+          key: output.key,
+          type: output.type.toTypeMsg(),
+          serialized_value: output.serialized_value
+        }
+      }),
       tree_ref: ''
     }
   }
@@ -450,7 +339,6 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     new_node_name,
     new_node_class,
     new_node_module,
-    new_node_options,
     new_node_inputs,
     new_node_outputs,
     flow_control_nodes,
@@ -464,7 +352,6 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     changeCopyMode,
     changeNodeName,
     changeNodeClass,
-    updateParamValue,
     buildNodeMsg
   }
 })

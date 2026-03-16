@@ -29,21 +29,12 @@
  */
 import { useEditorStore } from '@/stores/editor'
 import { useEditNodeStore } from '@/stores/edit_node'
-import {
-  type BTEditorNode,
-  type TrimmedNodeData,
-  type NodeIO,
-  type UUIDString,
-  type DocumentedNode,
-  type DataEdgeTerminal,
-  type IdentifiedDataEdgePoint,
-  IOKind
-} from '@/types/types'
+import type { UUIDString, DocumentedNode } from '@/types/types'
 import * as d3 from 'd3'
 import type { HierarchyNode, HierarchyLink } from 'd3-hierarchy'
 import { flextree, type FlextreeNode } from 'd3-flextree'
 import * as uuid from 'uuid'
-import { rosToUuid } from '@/utils'
+import { getTypeFromMsg, rosToUuid } from '@/utils'
 import {
   tree_node_css_class,
   node_body_css_class,
@@ -75,6 +66,12 @@ import { findTree } from '../tree_selection'
 import { D3TreeDataDisplay, getDataVertOffsets } from './draw_tree_data'
 import { D3DropTargetDisplay } from './draw_drop_targets'
 import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons'
+import {
+  type BTEditorNode,
+  type IdentifiedDataEdgePoint,
+  type DataEdgeTerminal,
+  IOKind
+} from '@/types/editor_types'
 
 const line_wrap_regex: RegExp = /[a-z0-9][A-Z]|[_\- ][a-zA-Z]/dg
 
@@ -200,8 +197,8 @@ function drawSubtrees(
           y: (input_offsets[index] - top_padding) / nested_tree_scaling,
           tree_id: node.data.tree_id,
           node_id: node.data.node_id,
-          kind: IOKind.INPUT,
-          key: data.key
+          key: data.key,
+          kind: IOKind.INPUT
         })
       })
       const output_offsets = getDataVertOffsets(node.data.outputs)
@@ -211,8 +208,8 @@ function drawSubtrees(
           y: (output_offsets[index] - top_padding) / nested_tree_scaling,
           tree_id: node.data.tree_id,
           node_id: node.data.node_id,
-          kind: IOKind.OUTPUT,
-          key: data.key
+          key: data.key,
+          kind: IOKind.OUTPUT
         })
       })
 
@@ -543,13 +540,6 @@ export class D3TreeDisplay {
       return undefined
     }
 
-    // Strips potentially additional properties
-    const onlyKeyAndType = (nodeData: NodeIO) =>
-      ({
-        key: nodeData.key,
-        serialized_type: nodeData.serialized_type
-      } as TrimmedNodeData)
-
     // Trim the serialized data values from the node data - we won't
     // render them, so don't clutter the DOM with the data
     const editor_nodes: BTEditorNode[] = tree_structure.nodes.map((node) => {
@@ -560,9 +550,20 @@ export class D3TreeDisplay {
         module: node.module,
         max_children: node.max_children,
         child_ids: node.child_ids.map(rosToUuid),
-        options: node.options.map(onlyKeyAndType),
-        inputs: node.inputs.map(onlyKeyAndType),
-        outputs: node.outputs.map(onlyKeyAndType),
+        inputs: node.inputs.map((input) => {
+          return {
+            key: input.key,
+            type: getTypeFromMsg(input.type),
+            serialized_value: input.serialized_value
+          }
+        }),
+        outputs: node.outputs.map((output) => {
+          return {
+            key: output.key,
+            type: getTypeFromMsg(output.type),
+            serialized_value: output.serialized_value
+          }
+        }),
         tree_ref: node.tree_ref ? rosToUuid(node.tree_ref) : '',
         tree_id: this.tree_id,
         size: { width: 1, height: 1 },
@@ -579,7 +580,6 @@ export class D3TreeDisplay {
       child_ids: [],
       inputs: [],
       outputs: [],
-      options: [],
       tree_ref: '',
       tree_id: this.tree_id,
       size: { width: 0, height: 0 },

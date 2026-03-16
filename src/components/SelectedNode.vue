@@ -29,7 +29,7 @@
  -->
 <script setup lang="ts">
 import { ref } from 'vue'
-import { rosToUuid, serializeNodeOptions } from '@/utils'
+import { rosToUuid } from '@/utils'
 import { notify } from '@kyvg/vue3-notification'
 import EditableNode from './EditableNode.vue'
 import LogsDisplay from './LogsDisplay.vue'
@@ -116,7 +116,13 @@ function updateNode() {
       node_id: edit_node_store.selected_node.node_id,
       rename_node: true,
       new_name: edit_node_store.new_node_name,
-      options: serializeNodeOptions(edit_node_store.new_node_options)
+      inputs: edit_node_store.new_node_inputs.map((x) => {
+        return {
+          key: x.key,
+          type: x.type.toTypeMsg(),
+          serialized_value: x.serialized_value
+        }
+      })
     } as SetOptionsRequest,
     (response: SetOptionsResponse) => {
       if (response.success) {

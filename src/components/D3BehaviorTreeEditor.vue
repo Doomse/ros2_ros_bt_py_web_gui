@@ -30,15 +30,7 @@
 <script setup lang="ts">
 import { EditorSkin, useEditorStore } from '@/stores/editor'
 import { useEditNodeStore } from '@/stores/edit_node'
-import {
-  type DataEdgePoint,
-  type DataEdgeTerminal,
-  type DataEdge,
-  type DropTarget,
-  type BTEditorNode,
-  NodeStateValues
-} from '@/types/types'
-import { IOKind } from '@/types/types'
+import { NodeStateValues } from '@/types/types'
 import { notify } from '@kyvg/vue3-notification'
 import * as d3 from 'd3'
 import { onMounted, computed, ref, watch } from 'vue'
@@ -75,6 +67,13 @@ import {
 } from '@/tree_display/draw_tree_config'
 import { D3TreeDisplay } from '@/tree_display/draw_tree'
 import { findNodeInTreeList, getNodeStates } from '@/tree_selection'
+import type {
+  BTEditorNode,
+  DropTarget,
+  DataEdgeTerminal,
+  DataEdge,
+  DataEdgePoint
+} from '@/types/editor_types'
 
 const editor_store = useEditorStore()
 const edit_node_store = useEditNodeStore()
@@ -699,13 +698,7 @@ onMounted(() => {
       y: editor_store.data_edge_endpoint.y + vertical_tree_offset
     }
 
-    d3.select(draw_indicator_ref.value).attr('d', () => {
-      if (editor_store.data_edge_endpoint!.kind === IOKind.INPUT) {
-        return drawDataLine(mouse_point, other_endpoint)
-      } else {
-        return drawDataLine(other_endpoint, mouse_point)
-      }
-    })
+    d3.select(draw_indicator_ref.value).attr('d', () => drawDataLine(other_endpoint, mouse_point))
   })
 
   viewport.on('mouseup.drawedge', () => {

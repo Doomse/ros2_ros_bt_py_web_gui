@@ -101,35 +101,22 @@ const show_description = ref<boolean>(false)
       </div>
     </div>
     <div class="mb-3">
-      <h5>Options</h5>
+      <h5>Inputs</h5>
       <div class="list-group">
         <ParamInputs
-          v-for="option in edit_node_store.new_node_options"
+          v-for="option in edit_node_store.new_node_inputs"
           :key="'option_' + option.key"
           :data_key="option.key"
-          category="options"
         ></ParamInputs>
       </div>
     </div>
-    <div class="mb-3">
-      <h5>Input</h5>
-      <div class="list-group">
-        <ParamDisplay
-          v-for="input in edit_node_store.new_node_inputs"
-          :key="'input_' + input.key"
-          :data_key="input.key"
-          category="inputs"
-        ></ParamDisplay>
-      </div>
-    </div>
     <div className="mb-3">
-      <h5>Output</h5>
+      <h5>Outputs</h5>
       <div class="list-group">
         <ParamDisplay
           v-for="output in edit_node_store.new_node_outputs"
           :key="'output_' + output.key"
           :data_key="output.key"
-          category="outputs"
         ></ParamDisplay>
       </div>
     </div>

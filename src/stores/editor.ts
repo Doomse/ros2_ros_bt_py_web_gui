@@ -31,16 +31,9 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import * as uuid from 'uuid'
 import { TreeExecutionCommands } from '@/types/services/ControlTreeExecution'
-import type {
-  Wiring,
-  DocumentedNode,
-  TreeStructure,
-  BTEditorNode,
-  DataEdgeTerminal,
-  TreeState,
-  TreeData,
-  UUIDString
-} from '@/types/types'
+import type { DocumentedNode, TreeStructure, TreeState, TreeData, UUIDString } from '@/types/types'
+import type { Wiring } from '@/types/data_types'
+import type { BTEditorNode, DataEdgeTerminal } from '@/types/editor_types'
 
 export enum EditorSkin {
   DARK = 'darkmode',

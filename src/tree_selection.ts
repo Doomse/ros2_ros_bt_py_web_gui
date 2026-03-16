@@ -27,17 +27,15 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+import type { Wiring, WiringData, NodeDataLocation } from './types/data_types'
 import type {
   TreeStructure,
   NodeStructure,
   TreeState,
   NodeState,
-  Wiring,
   TreeData,
-  WiringData,
   UUIDMsg,
-  UUIDString,
-  NodeDataLocation
+  UUIDString
 } from './types/types'
 import { rosToUuid, compareWirings } from './utils'
 

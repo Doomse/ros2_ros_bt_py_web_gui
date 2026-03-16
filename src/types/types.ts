@@ -28,7 +28,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-import type { FlextreeNode } from 'd3-flextree'
+import type { NodeIO, Wiring, NodeDataLocation, WiringData } from './data_types'
 
 export type UUIDMsg = string
 export type UUIDString = string
@@ -36,15 +36,6 @@ export type UUIDString = string
 export type RosTime = {
   sec: number
   nanosec: number
-}
-
-export type NodeIO = {
-  key: string
-  serialized_type: string
-}
-
-export type NodeOption = NodeIO & {
-  serialized_value: string
 }
 
 export type NodeStructure = {
@@ -58,7 +49,6 @@ export type NodeStructure = {
   max_children: number
   child_ids: UUIDMsg[]
 
-  options: NodeOption[]
   inputs: NodeIO[]
   outputs: NodeIO[]
 
@@ -72,24 +62,12 @@ export type DocumentedNode = {
 
   max_children: number
 
-  options: NodeOption[]
   inputs: NodeIO[]
   outputs: NodeIO[]
 
   doc: string
   tags: string[]
   node_type?: string
-}
-
-export type NodeDataLocation = {
-  node_id: UUIDMsg
-  data_kind: string
-  data_key: string
-}
-
-export type Wiring = {
-  source: NodeDataLocation
-  target: NodeDataLocation
 }
 
 export type TreeStructure = {
@@ -145,13 +123,6 @@ export type TreeStateList = {
   tree_states: TreeState[]
 }
 
-export type WiringData = {
-  wiring: Wiring
-  serialized_data: string
-  serialized_type: string
-  serialized_expected_type: string
-}
-
 export type TreeData = {
   tree_id: UUIDMsg
   wiring_data: WiringData[]
@@ -159,89 +130,6 @@ export type TreeData = {
 
 export type TreeDataList = {
   tree_data: TreeData[]
-}
-
-export type DataEdgePoint = {
-  x: number
-  y: number
-}
-
-export type IdentifiedDataEdgePoint = DataEdgePoint & {
-  tree_id: UUIDString
-  node_id: UUIDString
-  kind: IOKind
-  key: string
-}
-
-export type DataEdgeTerminal = DataEdgePoint & {
-  node: FlextreeNode<BTEditorNode>
-  index: number
-  kind: IOKind
-  key: string
-  type: string
-}
-
-export const enum IOKind {
-  INPUT = 'inputs',
-  OUTPUT = 'outputs',
-  OTHER = 'other'
-}
-
-export type IdentifiedDataEdge = {
-  p1: IdentifiedDataEdgePoint
-  p2: IdentifiedDataEdgePoint
-  key: string
-}
-
-export type DataEdge = {
-  source: DataEdgeTerminal
-  target: DataEdgeTerminal
-  wiring: Wiring
-}
-
-export type DropTarget = {
-  node: FlextreeNode<BTEditorNode>
-  position: Position
-}
-
-export const enum Position {
-  TOP = 'top',
-  BOTTOM = 'bottom',
-  LEFT = 'left',
-  RIGHT = 'right',
-  CENTER = 'center',
-  ROOT = 'root'
-}
-
-export type TrimmedNodeData = {
-  key: string
-  serialized_type: string
-}
-
-export type BTEditorNode = {
-  node_id: UUIDString
-  name: string
-
-  node_class: string
-  module: string
-
-  max_children: number
-  child_ids: UUIDString[]
-
-  inputs: TrimmedNodeData[]
-  outputs: TrimmedNodeData[]
-  options: TrimmedNodeData[]
-
-  // Reference to contained tree, if at all
-  tree_ref: UUIDString | ''
-
-  // Reference to own tree for global identification
-  tree_id: UUIDString
-
-  size: { width: number; height: number }
-  offset: { x: number; y: number }
-
-  state?: NodeStateValues
 }
 
 export type Package = {
@@ -271,20 +159,6 @@ export type Channels = {
   actions: Channel[]
 }
 
-export type Error = {
-  id: number
-  time: number
-  text: string
-}
-
-export type DebugSettings = {
-  single_step: boolean
-  collect_performance_data: boolean
-  publish_subtrees: boolean
-  collect_node_diagnostics: boolean
-  breakpoint_names: string[]
-}
-
 export const enum FileType {
   FILE = 'file',
   DIR = 'directory'
@@ -294,40 +168,6 @@ export type PackageStructure = {
   name: string
   item_id: number
   type: FileType
-}
-
-export type PyB64 = { 'py/b64': string }
-
-export type PyObject = { 'py/object': string }
-
-export type PyType = { 'py/type': string }
-export type PyTuple = { 'py/tuple': never[][] }
-
-export type PyReduce = { 'py/reduce': (PyType | PyTuple | null)[] }
-
-export type ValueTypes =
-  | string
-  | boolean
-  | number
-  | []
-  | Record<string, never>
-  | PyB64
-  | PyReduce
-  | PyObject
-
-export type ParamType = {
-  type: string
-  value: ValueTypes
-}
-
-export type OptionData = {
-  key: string
-  value: ParamType
-}
-
-export type IOData = {
-  key: string
-  type: string
 }
 
 export enum LogLevel {

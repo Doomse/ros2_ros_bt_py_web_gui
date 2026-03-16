@@ -28,20 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 import { useEditorStore } from '@/stores/editor'
-import type {
-  DataEdgePoint,
-  DataEdgeTerminal,
-  DataEdge,
-  NodeDataLocation,
-  BTEditorNode,
-  TrimmedNodeData,
-  Wiring,
-  UUIDString,
-  IdentifiedDataEdge,
-  IdentifiedDataEdgePoint
-} from '@/types/types'
-import { IOKind } from '@/types/types'
-import { prettyprint_type, replaceNameIdParts, typesCompatible } from '@/utils'
+import type { UUIDString } from '@/types/types'
+import { replaceNameIdParts, typesCompatible } from '@/utils'
 import * as d3 from 'd3'
 import type { FlextreeNode } from 'd3-flextree'
 import * as uuid from 'uuid'
@@ -68,10 +56,21 @@ import {
 } from './draw_tree_config'
 import { findTree } from '../tree_selection'
 import { addDataEdge } from '@/tree_manipulation'
+import type { NodeDataLocation, Wiring } from '@/types/data_types'
+import type {
+  NodeData,
+  DataEdgePoint,
+  DataEdgeTerminal,
+  DataEdge,
+  IdentifiedDataEdge,
+  IdentifiedDataEdgePoint,
+  BTEditorNode
+} from '@/types/editor_types'
+import { IOKind } from '@/types/editor_types'
 
 // Calculates vertical offsets for data vertices based on a shared prefix
 //   also returns an extra offset at the end to give an indication of the total height.
-export function getDataVertOffsets(data_list: TrimmedNodeData[]): number[] {
+export function getDataVertOffsets(data_list: NodeData[]): number[] {
   let vertical_offset = io_gripper_spacing
   let previous_prefix = ''
   const offsets = data_list.map((data, index) => {
@@ -183,7 +182,6 @@ function drawNewDataVert(
           return -5
         case IOKind.OUTPUT:
           return io_gripper_size + 5
-        case IOKind.OTHER:
         default:
           return 0
       }
@@ -352,25 +350,25 @@ export class D3TreeDataDisplay {
       }
 
       const input_offsets = getDataVertOffsets(node.data.inputs)
-      node.data.inputs.map((input: TrimmedNodeData, index: number) => {
+      node.data.inputs.map((input: NodeData, index: number) => {
         data_points.push({
           node: node,
           index: index,
           kind: IOKind.INPUT,
           key: input.key,
-          type: input.serialized_type,
+          type: input.type,
           x: node.x - node.data.size.width * 0.5 - io_gripper_size,
           y: node.y + input_offsets[index]
         })
       })
       const output_offsets = getDataVertOffsets(node.data.outputs)
-      node.data.outputs.map((output: TrimmedNodeData, index: number) => {
+      node.data.outputs.map((output: NodeData, index: number) => {
         data_points.push({
           node: node,
           index: index,
           kind: IOKind.OUTPUT,
           key: output.key,
-          type: output.serialized_type,
+          type: output.type,
           x: node.x + node.data.size.width * 0.5,
           y: node.y + output_offsets[index]
         })
@@ -394,7 +392,7 @@ export class D3TreeDataDisplay {
       .text((d) => replaceNameIdParts(d.node.data.tree_ref, d.key))
     data_vertices
       .select('.' + data_vert_label_type_css_class)
-      .text((d) => '(type: ' + prettyprint_type(d.type) + ')')
+      .text((d) => '(type: ' + d.type.prettyprint() + ')')
 
     // Highlight terminals with duplicate display names
     const display_name_set = new Map<UUIDString, Set<string>>()
@@ -470,10 +468,14 @@ export class D3TreeDataDisplay {
     // Construct edge array by matching tree_msg wirings
     const data_edges: DataEdge[] = []
 
-    function matchEndpoint(wire_point: NodeDataLocation, terminal: DataEdgeTerminal): boolean {
+    function matchEndpoint(
+      wire_point: NodeDataLocation,
+      kind: IOKind,
+      terminal: DataEdgeTerminal
+    ): boolean {
       return (
         rosToUuid(wire_point.node_id) === terminal.node.data.node_id &&
-        wire_point.data_kind === terminal.kind &&
+        kind === terminal.kind &&
         wire_point.data_key === terminal.key
       )
     }
@@ -481,10 +483,10 @@ export class D3TreeDataDisplay {
     tree_structure.data_wirings.forEach((wiring: Wiring) => {
       // Match Terminals with wiring data
       const source = data_points.find((term: DataEdgeTerminal) =>
-        matchEndpoint(wiring.source, term)
+        matchEndpoint(wiring.source, IOKind.OUTPUT, term)
       )
       const target = data_points.find((term: DataEdgeTerminal) =>
-        matchEndpoint(wiring.target, term)
+        matchEndpoint(wiring.target, IOKind.INPUT, term)
       )
 
       if (source === undefined || target === undefined) {

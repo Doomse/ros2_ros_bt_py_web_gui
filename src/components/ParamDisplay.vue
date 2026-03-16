@@ -31,27 +31,21 @@
 import { useEditNodeStore } from '@/stores/edit_node'
 import { useEditorStore } from '@/stores/editor'
 import { findNode, findTree } from '@/tree_selection'
-import type { TreeStructure, IOData, NodeDataLocation, Wiring } from '@/types/types'
+import type { Wiring, NodeDataLocation } from '@/types/data_types'
+import type { NodeData } from '@/types/editor_types'
+import type { TreeStructure } from '@/types/types'
 import { compareRosUuid, replaceNameIdParts } from '@/utils'
 import { computed } from 'vue'
 
 const props = defineProps<{
-  category: 'inputs' | 'outputs'
   data_key: string
 }>()
 
 const editor_store = useEditorStore()
 const edit_node_store = useEditNodeStore()
 
-const param = computed<IOData | undefined>(() => {
-  switch (props.category) {
-    case 'inputs':
-      return edit_node_store.new_node_inputs.find((x) => x.key === props.data_key)
-    case 'outputs':
-      return edit_node_store.new_node_outputs.find((x) => x.key === props.data_key)
-    default:
-      return undefined
-  }
+const param = computed<NodeData | undefined>(() => {
+  return edit_node_store.new_node_outputs.find((x) => x.key === props.data_key)
 })
 
 const display_key = computed<string>(() => {
@@ -72,9 +66,7 @@ const connected_edges = computed<Wiring[]>(() => {
   if (containing_tree.value === undefined) {
     return []
   }
-  return containing_tree.value.data_wirings.filter(
-    (wiring) => matchEndpoint(wiring.source) || matchEndpoint(wiring.target)
-  )
+  return containing_tree.value.data_wirings.filter((wiring) => matchEndpoint(wiring.source))
 })
 
 function matchEndpoint(endpoint: NodeDataLocation): boolean {
@@ -83,7 +75,6 @@ function matchEndpoint(endpoint: NodeDataLocation): boolean {
   }
   return (
     endpoint.data_key === props.data_key &&
-    endpoint.data_kind === props.category &&
     compareRosUuid(endpoint.node_id, edit_node_store.selected_node.node_id)
   )
 }
@@ -92,17 +83,7 @@ function printOtherEndpoint(wiring: Wiring): string {
   if (containing_tree.value === undefined) {
     return 'Other Endpoint'
   }
-
-  let endpoint: NodeDataLocation | null = null
-  if (matchEndpoint(wiring.source)) {
-    endpoint = wiring.target
-  }
-  if (matchEndpoint(wiring.target)) {
-    endpoint = wiring.source
-  }
-  if (endpoint === null) {
-    return 'Other Endpoint'
-  }
+  const endpoint = wiring.target
   const node = findNode(containing_tree.value.nodes, endpoint.node_id)
   if (node === undefined) {
     return 'Other Endpoint'
@@ -115,7 +96,7 @@ function printOtherEndpoint(wiring: Wiring): string {
   <div v-if="param !== undefined" class="list-group-item">
     <div class="h5">
       {{ display_key }}&ensp;
-      <span className="text-muted">(type: {{ param.type }})</span>
+      <span className="text-muted">(type: {{ param.type.prettyprint() }})</span>
     </div>
     <div v-if="connected_edges" class="d-flex flex-wrap m-1">
       <button
