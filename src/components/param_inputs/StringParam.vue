@@ -28,10 +28,12 @@
  *  POSSIBILITY OF SUCH DAMAGE.
 -->
 <script setup lang="ts">
-import type { BytesType } from '@/types/data_classes'
+import type { StringType } from '@/types/data_classes'
+import SearchableInput from '../SearchableInput.vue'
+import Fuse from 'fuse.js'
 
 const props = defineProps<{
-  type: BytesType
+  type: StringType
 }>()
 
 const value = defineModel<string>({
@@ -39,34 +41,18 @@ const value = defineModel<string>({
     return props.type.parseValue(value)
   },
   set(value) {
-    return props.type.serializeValue(cleanHexString(value))
+    return props.type.serializeValue(value)
   }
 })
-
-const nonhex_regex = /[^0-9A-F]/
-
-function cleanHexString(input: string): string {
-  // Normalize to uppercase and strip non-hex characters
-  input = input.toUpperCase().replaceAll(nonhex_regex, '')
-
-  // If length is odd, prepend a zero
-  if (input.length % 2 !== 0) {
-    input = '0' + input
-  }
-
-  return input
-}
 
 function validate(event: Event) {
   const target = event.target as HTMLInputElement
 
-  target.value = cleanHexString(target.value)
   const value = target.value
 
   if (
-    value.match(nonhex_regex) ||
-    value.length / 2 > props.type.max_length ||
-    (props.type.strict_length && value.length / 2 + 0.5 < props.type.max_length)
+    value.length > props.type.max_length ||
+    (props.type.strict_length && value.length < props.type.max_length)
   ) {
     target.classList.add('is-invalid')
     return
@@ -78,11 +64,21 @@ function validate(event: Event) {
 
 <template>
   <input
+    v-if="type.valid_values.length === 0"
     v-model="value"
     type="text"
     class="form-control"
-    :minlength="type.strict_length ? type.max_length * 2 - 1 : 0"
-    :maxlength="type.max_length * 2"
+    :minlength="type.strict_length ? type.max_length : 0"
+    :maxlength="type.max_length"
     @input="validate"
+  />
+  <SearchableInput
+    v-else
+    v-model="value"
+    :item_list="type.valid_values"
+    :search_fuse="new Fuse(type.valid_values)"
+    :parse="(s: string) => s"
+    :search_target="(s: string) => s"
+    :render_function="(s: string) => s"
   />
 </template>

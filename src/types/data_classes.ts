@@ -28,9 +28,20 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { DataTypeValues, type NodeDataType } from './data_types'
+import { getDefaultTypeMsg, getTypeFromMsg, popFromTypeMessage, pushToTypeMessage } from '@/utils'
+import {
+  DataTypeValues,
+  ELEMENT_KEY,
+  FLOAT_LIMITS,
+  IDENTIFIER_KEY,
+  INT_FLOAT_MAX,
+  INT_LIMITS,
+  type NodeDataType,
+  type TypeValueOption
+} from './data_types'
+import type { NodeData } from './editor_types'
 
-export abstract class DataType<ValueType = any> {
+export abstract class DataContainer<ValueType = any> {
   allow_dynamic: boolean
   allow_static: boolean
   is_static: boolean
@@ -49,16 +60,26 @@ export abstract class DataType<ValueType = any> {
     } as NodeDataType
   }
 
-  abstract isCompatible(other: DataType): boolean
+  abstract isCompatible(other: DataContainer): boolean
 
   abstract prettyprint(): string
 
   abstract serializeValue(value: ValueType): string
 
   abstract parseValue(ser_value: string): ValueType
+
+  abstract getSerializedDefault(): string
 }
 
-abstract class BuiltinDataType<ValueType> extends DataType<ValueType> {
+interface TypeContainer extends DataContainer {
+  getValueField: (ser_value: string) => DataContainer
+}
+
+function isTypeContainer(cont: DataContainer): cont is TypeContainer {
+  return 'getValueField' in cont
+}
+
+abstract class BuiltinContainer<ValueType> extends DataContainer<ValueType> {
   serializeValue(value: ValueType): string {
     return JSON.stringify(value)
   }
@@ -68,7 +89,7 @@ abstract class BuiltinDataType<ValueType> extends DataType<ValueType> {
   }
 }
 
-export class BoolType extends BuiltinDataType<boolean> {
+export class BoolType extends BuiltinContainer<boolean> {
   constructor(type_msg: NodeDataType) {
     if (type_msg.type_identifier !== DataTypeValues.BOOL_TYPE) {
       throw Error(`Type msg ${type_msg} has incorrect identifier for bool`)
@@ -82,37 +103,41 @@ export class BoolType extends BuiltinDataType<boolean> {
     return type_msg
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     return other instanceof BoolType
   }
 
   prettyprint(): string {
     return 'bool'
   }
+
+  getSerializedDefault(): string {
+    return this.serializeValue(false)
+  }
 }
 
-export class IntType extends BuiltinDataType<number> {
-  min_value: number
-  max_value: number
+export class IntType extends DataContainer<bigint> {
+  min_value: bigint
+  max_value: bigint
 
   constructor(type_msg: NodeDataType) {
     if (type_msg.type_identifier !== DataTypeValues.INT_TYPE) {
       throw Error(`Type msg ${type_msg} has incorrect identifier for int`)
     }
     super(type_msg)
-    this.min_value = type_msg.int_min_value
-    this.max_value = type_msg.int_max_value
+    this.min_value = BigInt(type_msg.min_value)
+    this.max_value = BigInt(type_msg.max_value)
   }
 
   toTypeMsg(): NodeDataType {
     const type_msg = super.toTypeMsg()
     type_msg.type_identifier = DataTypeValues.INT_TYPE
-    type_msg.int_min_value = this.min_value
-    type_msg.int_max_value = this.max_value
+    type_msg.min_value = this.min_value.toString()
+    type_msg.max_value = this.max_value.toString()
     return type_msg
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     if (!(other instanceof IntType)) {
       return false
     }
@@ -126,30 +151,28 @@ export class IntType extends BuiltinDataType<number> {
   }
 
   prettyprint(): string {
-    switch ([this.min_value, this.max_value]) {
-      case [-(2 ** 63), 2 ** 63 - 1]:
-        return 'int64'
-      case [-(2 ** 31), 2 ** 31 - 1]:
-        return 'int32'
-      case [-(2 ** 15), 2 ** 15 - 1]:
-        return 'int16'
-      case [-(2 ** 7), 2 ** 7 - 1]:
-        return 'int8'
-      case [0, 2 ** 64 - 1]:
-        return 'int64'
-      case [0, 2 ** 32 - 1]:
-        return 'int32'
-      case [0, 2 ** 16 - 1]:
-        return 'int16'
-      case [0, 2 ** 8 - 1]:
-        return 'int8'
-      default:
-        return `int(min=${this.min_value}, max=${this.max_value})`
+    for (const [key, [min, max]] of Object.entries(INT_LIMITS)) {
+      if (min === this.min_value && max === this.max_value) {
+        return key
+      }
     }
+    return `int(min=${this.min_value},max=${this.max_value})`
+  }
+
+  serializeValue(value: bigint): string {
+    return value.toString()
+  }
+
+  parseValue(ser_value: string): bigint {
+    return BigInt(ser_value)
+  }
+
+  getSerializedDefault(): string {
+    return this.serializeValue(0n)
   }
 }
 
-export class FloatType extends BuiltinDataType<number> {
+export class FloatType extends BuiltinContainer<number> {
   min_value: number
   max_value: number
 
@@ -158,19 +181,19 @@ export class FloatType extends BuiltinDataType<number> {
       throw Error(`Type msg ${type_msg} has incorrect identifier for float`)
     }
     super(type_msg)
-    this.min_value = type_msg.float_min_value
-    this.max_value = type_msg.float_max_value
+    this.min_value = Number(type_msg.min_value)
+    this.max_value = Number(type_msg.max_value)
   }
 
   toTypeMsg(): NodeDataType {
     const type_msg = super.toTypeMsg()
     type_msg.type_identifier = DataTypeValues.FLOAT_TYPE
-    type_msg.int_min_value = this.min_value
-    type_msg.int_max_value = this.max_value
+    type_msg.min_value = this.min_value.toString()
+    type_msg.max_value = this.max_value.toString()
     return type_msg
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     if (!(other instanceof FloatType)) {
       return false
     }
@@ -184,18 +207,20 @@ export class FloatType extends BuiltinDataType<number> {
   }
 
   prettyprint(): string {
-    switch ([this.min_value, this.max_value]) {
-      case [-1.7976931348623157e308, 1.7976931348623157e308]:
-        return 'float64'
-      case [-3.4028235e38, 3.4028235e38]:
-        return 'float32'
-      default:
-        return `float(min=${this.min_value}, max=${this.max_value})`
+    for (const [key, [min, max]] of Object.entries(FLOAT_LIMITS)) {
+      if (min === this.min_value && max === this.max_value) {
+        return key
+      }
     }
+    return `float(min=${this.min_value},max=${this.max_value})`
+  }
+
+  getSerializedDefault(): string {
+    return this.serializeValue(1.2)
   }
 }
 
-export class StringType extends BuiltinDataType<string> {
+export class StringType extends BuiltinContainer<string> {
   max_length: number
   strict_length: boolean
   valid_values: string[]
@@ -219,7 +244,7 @@ export class StringType extends BuiltinDataType<string> {
     return type_msg
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     if (!(other instanceof StringType)) {
       return false
     }
@@ -240,14 +265,18 @@ export class StringType extends BuiltinDataType<string> {
   }
 
   prettyprint(): string {
-    if (this.max_length === 2 ** 64 - 1) {
+    if (this.max_length === INT_FLOAT_MAX) {
       return 'string'
     }
     return `string${this.strict_length ? '=' : '<'}=${this.max_length}`
   }
+
+  getSerializedDefault(): string {
+    return this.serializeValue('foo')
+  }
 }
 
-export class PathType extends BuiltinDataType<string> {
+export class PathType extends BuiltinContainer<string> {
   max_length: number
   strict_length: boolean
   valid_values: string[]
@@ -270,7 +299,7 @@ export class PathType extends BuiltinDataType<string> {
     return type_msg
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     if (!(other instanceof PathType)) {
       return false
     }
@@ -291,14 +320,18 @@ export class PathType extends BuiltinDataType<string> {
   }
 
   prettyprint(): string {
-    if (this.max_length === 2 ** 64 - 1) {
+    if (this.max_length === INT_FLOAT_MAX) {
       return 'path'
     }
     return `path${this.strict_length ? '=' : '<'}=${this.max_length}`
   }
+
+  getSerializedDefault(): string {
+    throw Error('No default path available')
+  }
 }
 
-export class BytesType extends BuiltinDataType<string> {
+export class BytesType extends BuiltinContainer<string> {
   max_length: number
   strict_length: boolean
   valid_values: string[]
@@ -321,7 +354,7 @@ export class BytesType extends BuiltinDataType<string> {
     return type_msg
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     if (!(other instanceof BytesType)) {
       return false
     }
@@ -345,48 +378,43 @@ export class BytesType extends BuiltinDataType<string> {
     if (this.max_length === 1 && this.strict_length) {
       return 'byte'
     }
-    if (this.max_length === 2 ** 64 - 1) {
+    if (this.max_length === INT_FLOAT_MAX) {
       return 'bytes'
     }
     return `bytes${this.strict_length ? '=' : '<'}=${this.max_length}`
   }
+
+  getSerializedDefault(): string {
+    return this.serializeValue('00')
+  }
 }
 
-export class ListType extends BuiltinDataType<any[]> {
+export class ListType extends BuiltinContainer<any[]> {
   max_length: number
   strict_length: boolean
-  element_type?: DataType
+  element_type: DataContainer
 
   constructor(type_msg: NodeDataType) {
     if (type_msg.type_identifier !== DataTypeValues.LIST_TYPE) {
       throw Error(`Type msg ${type_msg} has incorrect identifier for list`)
     }
     super(type_msg)
-    this.max_length = type_msg.iterable_max_length[0]
-    this.strict_length = type_msg.iterable_strict_length[0]
-    // TODO Decode value type
+    const [max_length, strict_length, out_msg] = popFromTypeMessage(type_msg)
+    this.max_length = max_length
+    this.strict_length = strict_length
+    this.element_type = getTypeFromMsg(out_msg)
   }
 
   toTypeMsg(): NodeDataType {
-    let type_msg: NodeDataType
-    if (this.element_type === undefined) {
-      type_msg = super.toTypeMsg()
-      type_msg.value_type_identifier = [DataTypeValues.UNDEFINED_TYPE]
-      type_msg.iterable_max_length = []
-      type_msg.iterable_strict_length = []
-    } else {
-      type_msg = this.element_type.toTypeMsg()
-      type_msg.value_type_identifier = [type_msg.type_identifier].concat(
-        type_msg.value_type_identifier
-      )
-    }
-    type_msg.type_identifier = DataTypeValues.LIST_TYPE
-    type_msg.iterable_max_length = [this.max_length].concat(type_msg.iterable_max_length)
-    type_msg.iterable_strict_length = [this.strict_length].concat(type_msg.iterable_strict_length)
-    return type_msg
+    return pushToTypeMessage(
+      DataTypeValues.LIST_TYPE,
+      this.max_length,
+      this.strict_length,
+      this.element_type.toTypeMsg()
+    )
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     if (!(other instanceof ListType)) {
       return false
     }
@@ -396,34 +424,22 @@ export class ListType extends BuiltinDataType<any[]> {
     if (this.strict_length && !other.strict_length) {
       return false
     }
-    if (this.element_type !== undefined) {
-      if (other.element_type === undefined) {
-        return false
-      }
-      if (!this.element_type.isCompatible(other.element_type)) {
-        return false
-      }
-    }
-    return true
+    return this.element_type.isCompatible(other.element_type)
   }
 
   prettyprint(): string {
-    let prt_str = 'list'
-    if (this.element_type !== undefined) {
-      prt_str += `[${this.element_type.prettyprint()}]`
-    }
-    if (this.max_length !== 2 ** 64 - 1) {
+    let prt_str = `list[${this.element_type.prettyprint()}]`
+    if (this.max_length !== INT_FLOAT_MAX) {
       prt_str += `${this.strict_length ? '=' : '<'}=${this.max_length}`
     }
     return prt_str
   }
 
   serializeValue(value: any[]): string {
-    if (this.element_type === undefined) {
-      return super.serializeValue(value)
-    }
     const ser_list: any[] = []
-    value.forEach((v) => ser_list.push(this.element_type!.serializeValue(v)))
+    for (const elem of value) {
+      ser_list.push(this.element_type.serializeValue(elem))
+    }
     return super.serializeValue(ser_list)
   }
 
@@ -433,46 +449,48 @@ export class ListType extends BuiltinDataType<any[]> {
     }
     const value_list = JSON.parse(ser_value) as any[]
     const value: any[] = []
-    value_list.forEach((v) => value.push(this.element_type!.parseValue(JSON.stringify(v))))
+    for (const elem of value_list) {
+      value.push(this.element_type.parseValue(JSON.stringify(elem)))
+    }
     return value
+  }
+
+  getSerializedDefault(): string {
+    const default_elem = this.element_type.getSerializedDefault()
+    const default_list = []
+    for (let index = 0; index < (this.strict_length ? this.max_length : 1); index++) {
+      default_list.push(this.element_type.parseValue(default_elem))
+    }
+    return this.serializeValue(default_list)
   }
 }
 
-export class DictType extends BuiltinDataType<Map<string, any>> {
+export class DictType extends BuiltinContainer<Map<string, any>> {
   max_length: number
   strict_length: boolean
-  element_type?: DataType
+  element_type: DataContainer
 
   constructor(type_msg: NodeDataType) {
     if (type_msg.type_identifier !== DataTypeValues.DICT_TYPE) {
       throw Error(`Type msg ${type_msg} has incorrect identifier for dict`)
     }
     super(type_msg)
-    this.max_length = type_msg.iterable_max_length[0]
-    this.strict_length = type_msg.iterable_strict_length[0]
-    // TODO Decode value type
+    const [max_length, strict_length, out_msg] = popFromTypeMessage(type_msg)
+    this.max_length = max_length
+    this.strict_length = strict_length
+    this.element_type = getTypeFromMsg(out_msg)
   }
 
   toTypeMsg(): NodeDataType {
-    let type_msg: NodeDataType
-    if (this.element_type === undefined) {
-      type_msg = super.toTypeMsg()
-      type_msg.value_type_identifier = [DataTypeValues.UNDEFINED_TYPE]
-      type_msg.iterable_max_length = []
-      type_msg.iterable_strict_length = []
-    } else {
-      type_msg = this.element_type.toTypeMsg()
-      type_msg.value_type_identifier = [type_msg.type_identifier].concat(
-        type_msg.value_type_identifier
-      )
-    }
-    type_msg.type_identifier = DataTypeValues.DICT_TYPE
-    type_msg.iterable_max_length = [this.max_length].concat(type_msg.iterable_max_length)
-    type_msg.iterable_strict_length = [this.strict_length].concat(type_msg.iterable_strict_length)
-    return type_msg
+    return pushToTypeMessage(
+      DataTypeValues.DICT_TYPE,
+      this.max_length,
+      this.strict_length,
+      this.element_type.toTypeMsg()
+    )
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     if (!(other instanceof ListType)) {
       return false
     }
@@ -482,32 +500,18 @@ export class DictType extends BuiltinDataType<Map<string, any>> {
     if (this.strict_length && !other.strict_length) {
       return false
     }
-    if (this.element_type !== undefined) {
-      if (other.element_type === undefined) {
-        return false
-      }
-      if (!this.element_type.isCompatible(other.element_type)) {
-        return false
-      }
-    }
-    return true
+    return this.element_type.isCompatible(other.element_type)
   }
 
   prettyprint(): string {
-    let prt_str = 'dict'
-    if (this.element_type !== undefined) {
-      prt_str += `[${this.element_type.prettyprint()}]`
-    }
-    if (this.max_length !== 2 ** 64 - 1) {
+    let prt_str = `dict[${this.element_type.prettyprint()}]`
+    if (this.max_length !== INT_FLOAT_MAX) {
       prt_str += `${this.strict_length ? '=' : '<'}=${this.max_length}`
     }
     return prt_str
   }
 
   serializeValue(value: Map<string, any>): string {
-    if (this.element_type === undefined) {
-      return super.serializeValue(value)
-    }
     const ser_dict = new Map<string, string>()
     value.forEach((v, k) => ser_dict.set(k, this.element_type!.serializeValue(v)))
     return super.serializeValue(ser_dict)
@@ -519,32 +523,40 @@ export class DictType extends BuiltinDataType<Map<string, any>> {
     }
     const value_dict = JSON.parse(ser_value) as any[]
     const value = new Map<string, any>()
-    Object.entries(value_dict).forEach(([k, v]) =>
-      value.set(k, this.element_type!.parseValue(JSON.stringify(v)))
-    )
+    for (const [k, v] of Object.entries(value_dict))
+      value.set(k, this.element_type.parseValue(JSON.stringify(v)))
     return value
+  }
+
+  getSerializedDefault(): string {
+    const default_elem = this.element_type.getSerializedDefault()
+    const default_dict = new Map<string, any>()
+    for (let index = 0; index < (this.strict_length ? this.max_length : 1); index++) {
+      default_dict.set(`i${index}`, this.element_type.parseValue(default_elem))
+    }
+    return this.serializeValue(default_dict)
   }
 }
 
-export class BuiltinType extends DataType<string> {
-  valid_types: string[]
+export class BuiltinType extends BuiltinContainer<Record<string, any>> {
+  valid_types: TypeValueOption[]
 
   constructor(type_msg: NodeDataType) {
     if (type_msg.type_identifier !== DataTypeValues.BUILTIN_TYPE) {
       throw Error(`Type msg ${type_msg} has incorrect identifier for builtin`)
     }
     super(type_msg)
-    this.valid_types = type_msg.serialized_value_options
+    this.valid_types = type_msg.serialized_value_options.map((x) => JSON.parse(x))
   }
 
   toTypeMsg(): NodeDataType {
     const type_msg = super.toTypeMsg()
     type_msg.type_identifier = DataTypeValues.BUILTIN_TYPE
-    type_msg.serialized_value_options = this.valid_types
+    type_msg.serialized_value_options = this.valid_types.map((x) => JSON.stringify(x))
     return type_msg
   }
 
-  isCompatible(other: DataType): boolean {
+  isCompatible(other: DataContainer): boolean {
     if (!(other instanceof BuiltinType)) {
       return false
     }
@@ -562,11 +574,155 @@ export class BuiltinType extends DataType<string> {
     return 'type'
   }
 
-  serializeValue(value: string): string {
-    return value
+  static setTypeMsgFields(value: Record<string, any>): NodeDataType {
+    if (Object.keys(value).includes(ELEMENT_KEY)) {
+      const inner_type_msg = BuiltinType.setTypeMsgFields(value[ELEMENT_KEY])
+      return pushToTypeMessage(
+        value[IDENTIFIER_KEY],
+        value.max_length,
+        value.strict_length,
+        inner_type_msg
+      )
+    }
+    const type_msg = getDefaultTypeMsg()
+    for (const [k, v] of Object.entries(value)) {
+      type_msg[k] = v
+    }
+    return type_msg
   }
 
-  parseValue(ser_value: string): string {
-    return ser_value
+  getValueField(ser_value: string): DataContainer {
+    return getTypeFromMsg(BuiltinType.setTypeMsgFields(this.parseValue(ser_value)))
+  }
+
+  getSerializedDefault(): string {
+    throw Error('No default for type fields')
+  }
+}
+
+// TODO Handling of Ros types is missing
+export class BuiltinOrRosType extends DataContainer<any> {
+  inner_type: BuiltinType
+
+  constructor(type_msg: NodeDataType) {
+    if (type_msg.type_identifier !== DataTypeValues.BUILTIN_OR_ROS_TYPE) {
+      throw Error(`Type msg ${type_msg} has incorrect identifier for builtin`)
+    }
+    super(type_msg)
+    type_msg.type_identifier = DataTypeValues.BUILTIN_TYPE
+    this.inner_type = new BuiltinType(type_msg)
+  }
+
+  toTypeMsg(): NodeDataType {
+    const type_msg = this.inner_type.toTypeMsg()
+    type_msg.type_identifier = DataTypeValues.BUILTIN_OR_ROS_TYPE
+    return type_msg
+  }
+
+  isCompatible(other: DataContainer): boolean {
+    if (!(other instanceof BuiltinOrRosType)) {
+      return false
+    }
+    return this.inner_type.isCompatible(other.inner_type)
+  }
+
+  prettyprint(): string {
+    return this.inner_type.prettyprint()
+  }
+
+  serializeValue(value: any): string {
+    return this.inner_type.serializeValue(value)
+  }
+
+  parseValue(ser_value: string): any {
+    return this.inner_type.parseValue(ser_value)
+  }
+
+  getValueField(ser_value: string): DataContainer {
+    return this.inner_type.getValueField(ser_value)
+  }
+
+  getSerializedDefault(): string {
+    throw Error('No default for type fields')
+  }
+}
+
+export abstract class ReferenceContainer extends DataContainer<any> {
+  reference: string
+  target_type?: NodeData
+
+  constructor(type_msg: NodeDataType) {
+    super(type_msg)
+    this.reference = type_msg.reference_target
+  }
+
+  toTypeMsg(): NodeDataType {
+    const type_msg = super.toTypeMsg()
+    type_msg.reference_target = this.reference
+    return type_msg
+  }
+
+  setInnerType(inputs: NodeData[]) {
+    this.target_type = inputs.find((x) => x.key === this.reference)
+  }
+
+  getInnerType(): DataContainer | null {
+    if (this.target_type === undefined) {
+      return null
+    }
+    if (!isTypeContainer(this.target_type.type)) {
+      throw Error(`Target ${this.reference} is not a type field`)
+    }
+    return this.target_type.type.getValueField(this.target_type.serialized_value)
+  }
+}
+
+export class ReferenceType extends ReferenceContainer {
+  constructor(type_msg: NodeDataType) {
+    if (type_msg.type_identifier !== DataTypeValues.REFERENCE_TYPE) {
+      throw Error(`Type msg ${type_msg} has incorrect identifier for reference`)
+    }
+    super(type_msg)
+  }
+
+  toTypeMsg(): NodeDataType {
+    const type_msg = super.toTypeMsg()
+    type_msg.type_identifier = DataTypeValues.REFERENCE_TYPE
+    return type_msg
+  }
+
+  isCompatible(other: DataContainer): boolean {
+    if (!(other instanceof ReferenceType)) {
+      return false
+    }
+    return this.reference === other.reference
+  }
+
+  prettyprint(): string {
+    const inner_type = this.getInnerType()
+    if (inner_type === null) {
+      return `Value reference (target: ${this.reference})`
+    }
+    return inner_type.prettyprint() + ` ref(${this.reference})`
+  }
+
+  serializeValue(value: any): string {
+    const inner_type = this.getInnerType()
+    if (inner_type === null) {
+      throw Error('Reference has no valid target')
+    }
+    return inner_type.serializeValue(value)
+  }
+
+  parseValue(value: any): string {
+    const inner_type = this.getInnerType()
+    if (inner_type === null) {
+      throw Error('Reference has no valid target')
+    }
+    return inner_type.parseValue(value)
+  }
+
+  getSerializedDefault(): string {
+    throw Error('No default for type fields')
   }
 }

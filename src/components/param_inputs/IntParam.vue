@@ -1,5 +1,5 @@
 <!--
- *  Copyright 2024-2026 FZI Forschungszentrum Informatik
+ *  Copyright 2026 FZI Forschungszentrum Informatik
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
@@ -26,67 +26,72 @@
  *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- -->
+-->
 <script setup lang="ts">
-import { useEditNodeStore } from '@/stores/edit_node'
-import { useEditorStore } from '@/stores/editor'
-import type { PyOperand } from '@/types/python_types'
-import type { OptionData } from '@/types/types'
-import { computed } from 'vue'
-
-const editor_store = useEditorStore()
-const edit_node_store = useEditNodeStore()
+import type { IntType } from '@/types/data_classes'
 
 const props = defineProps<{
-  category: 'options'
-  data_key: string
-  op_type: 'unary' | 'binary'
+  type: IntType
 }>()
 
-const param = computed<OptionData | undefined>(() =>
-  edit_node_store.new_node_options.find((x) => x.key === props.data_key)
-)
+const value = defineModel<string, never, bigint, bigint>({
+  get(value) {
+    return props.type.parseValue(value)
+  },
+  set(value) {
+    return props.type.serializeValue(value)
+  }
+})
 
-function handleChange(event: Event) {
-  if (param.value === undefined) {
-    console.error('Undefined parameter')
+function parseBigInt(string_value: string): bigint | null {
+  let value: bigint
+  try {
+    value = BigInt(string_value)
+  } catch {
+    try {
+      value = BigInt(Number(string_value))
+    } catch {
+      return null
+    }
+  }
+  return value
+}
+
+function validate(event: Event) {
+  const target = event.target as HTMLInputElement
+
+  const new_val = parseBigInt(target.value)
+  if (new_val === null) {
+    target.classList.add('is-invalid')
     return
   }
 
-  const target = event.target as HTMLSelectElement
-
-  const operand_obj = param.value.value.value as PyOperand
-  operand_obj.operand_type = target.value
-
-  edit_node_store.updateParamValue(props.category, param.value.key, operand_obj)
+  if (new_val < props.type.min_value || new_val > props.type.max_value) {
+    target.classList.add('is-invalid')
+    return
+  }
+  target.classList.remove('is-invalid')
 }
 
-// Lookup for all possible values for operators and operands
-const options = {
-  unary: ['int', 'float'],
-  binary: ['int', 'float', 'bool']
+function setValue(event: Event) {
+  const target = event.target as HTMLInputElement
+
+  const new_val = parseBigInt(target.value)
+  if (new_val === null) {
+    return
+  }
+  value.value = new_val
 }
 </script>
 
 <template>
-  <div v-if="param !== undefined" class="form-group">
-    <label class="d-block">
-      {{ param.key }}
-    </label>
-    <select
-      class="form-select"
-      :value="(param.value.value as PyOperand).operand_type"
-      :disabled="editor_store.has_selected_subtree"
-      @change="handleChange"
-    >
-      <option
-        v-for="operator_option in options[props.op_type]"
-        :key="operator_option"
-        :value="operator_option"
-      >
-        {{ operator_option }}
-      </option>
-    </select>
-  </div>
-  <div v-else>Error loading param data</div>
+  <input
+    type="number"
+    class="form-control"
+    :value="value"
+    :min="Number(type.min_value)"
+    :max="Number(type.max_value)"
+    @input="validate"
+    @change="setValue"
+  />
 </template>

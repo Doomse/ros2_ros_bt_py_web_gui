@@ -105,7 +105,7 @@ const show_description = ref<boolean>(false)
       <div class="list-group">
         <ParamInputs
           v-for="option in edit_node_store.new_node_inputs"
-          :key="'option_' + option.key"
+          :key="'input_' + option.key"
           :data_key="option.key"
         ></ParamInputs>
       </div>

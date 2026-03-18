@@ -49,10 +49,13 @@ const param = computed<NodeData | undefined>(() => {
 })
 
 const display_key = computed<string>(() => {
-  if (param.value === undefined || edit_node_store.selected_node === undefined) {
+  if (param.value === undefined) {
     return ''
   }
-  return replaceNameIdParts(edit_node_store.selected_node?.tree_ref, param.value.key)
+  if (edit_node_store.selected_node === undefined) {
+    return param.value.key
+  }
+  return replaceNameIdParts(edit_node_store.selected_node.tree_ref, param.value.key)
 })
 
 const containing_tree = computed<TreeStructure | undefined>(() => {
@@ -94,9 +97,8 @@ function printOtherEndpoint(wiring: Wiring): string {
 
 <template>
   <div v-if="param !== undefined" class="list-group-item">
-    <div class="h5">
-      {{ display_key }}&ensp;
-      <span className="text-muted">(type: {{ param.type.prettyprint() }})</span>
+    <div>
+      {{ display_key }}
     </div>
     <div v-if="connected_edges" class="d-flex flex-wrap m-1">
       <button
@@ -107,6 +109,7 @@ function printOtherEndpoint(wiring: Wiring): string {
         {{ printOtherEndpoint(edge) }}
       </button>
     </div>
+    <div class="form-text">{{ param.type.prettyprint() }}</div>
   </div>
   <div v-else>Error loading param data</div>
 </template>

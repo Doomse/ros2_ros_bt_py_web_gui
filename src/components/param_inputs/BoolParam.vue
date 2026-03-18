@@ -28,61 +28,22 @@
  *  POSSIBILITY OF SUCH DAMAGE.
 -->
 <script setup lang="ts">
-import type { BytesType } from '@/types/data_classes'
+import type { BoolType } from '@/types/data_classes'
 
 const props = defineProps<{
-  type: BytesType
+  type: BoolType
 }>()
 
-const value = defineModel<string>({
+const value = defineModel<string, never, boolean, boolean>({
   get(value) {
     return props.type.parseValue(value)
   },
   set(value) {
-    return props.type.serializeValue(cleanHexString(value))
+    return props.type.serializeValue(value)
   }
 })
-
-const nonhex_regex = /[^0-9A-F]/
-
-function cleanHexString(input: string): string {
-  // Normalize to uppercase and strip non-hex characters
-  input = input.toUpperCase().replaceAll(nonhex_regex, '')
-
-  // If length is odd, prepend a zero
-  if (input.length % 2 !== 0) {
-    input = '0' + input
-  }
-
-  return input
-}
-
-function validate(event: Event) {
-  const target = event.target as HTMLInputElement
-
-  target.value = cleanHexString(target.value)
-  const value = target.value
-
-  if (
-    value.match(nonhex_regex) ||
-    value.length / 2 > props.type.max_length ||
-    (props.type.strict_length && value.length / 2 + 0.5 < props.type.max_length)
-  ) {
-    target.classList.add('is-invalid')
-    return
-  }
-
-  target.classList.remove('is-invalid')
-}
 </script>
 
 <template>
-  <input
-    v-model="value"
-    type="text"
-    class="form-control"
-    :minlength="type.strict_length ? type.max_length * 2 - 1 : 0"
-    :maxlength="type.max_length * 2"
-    @input="validate"
-  />
+  <input v-model="value" type="checkbox" class="form-check-input" />
 </template>

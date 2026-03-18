@@ -28,22 +28,22 @@
  *  POSSIBILITY OF SUCH DAMAGE.
 -->
 <script setup lang="ts">
-import { useEditNodeStore } from '@/stores/edit_node'
-import type { OptionData } from '@/types/types'
-import { computed, ref } from 'vue'
 import SelectFileModal from '../modals/SelectFileModal.vue'
-import type { PyFilePath } from '@/types/python_types'
-
-const edit_node_store = useEditNodeStore()
+import type { PathType } from '@/types/data_classes'
+import { ref } from 'vue'
 
 const props = defineProps<{
-  category: 'options'
-  data_key: string
+  type: PathType
 }>()
 
-const param = computed<OptionData | undefined>(() =>
-  edit_node_store.new_node_options.find((x) => x.key === props.data_key)
-)
+const value = defineModel<string>({
+  get(value) {
+    return props.type.parseValue(value)
+  },
+  set(value) {
+    return props.type.serializeValue(value)
+  }
+})
 
 const show_selection_modal = ref<boolean>(false)
 const from_packages = ref<boolean>(false)
@@ -59,16 +59,7 @@ function showFileModal() {
 }
 
 function selectFile(path: string) {
-  if (param.value === undefined) {
-    console.error('Undefined parameter')
-    return
-  }
-
-  const file_path_obj = param.value.value.value as PyFilePath
-  file_path_obj.path = path
-
-  edit_node_store.updateParamValue(props.category, param.value.key, file_path_obj)
-
+  value.value = path
   show_selection_modal.value = false
 }
 </script>
@@ -80,26 +71,15 @@ function selectFile(path: string) {
     @close="show_selection_modal = false"
     @select="selectFile"
   />
-  <div v-if="param !== undefined" class="form-group">
-    <label class="d-block">
-      {{ param.key }}
-    </label>
-    <div class="input-group">
-      <input
-        type="text"
-        class="form-control"
-        :value="(param.value.value as PyFilePath).path"
-        disabled
-      />
-      <button class="btn btn-primary" @click="showPackageModal">
-        <FontAwesomeIcon icon="fa-solid fa-folder-tree" aria-hidden="true" />
-        <span class="ms-1">Package</span>
-      </button>
-      <button class="btn btn-primary" @click="showFileModal">
-        <FontAwesomeIcon icon="fa-solid fa-folder-open" aria-hidden="true" />
-        <span className="ms-1">File</span>
-      </button>
-    </div>
+  <div class="input-group">
+    <input type="text" class="form-control" :value="value" disabled />
+    <button class="btn btn-primary" @click="showPackageModal">
+      <FontAwesomeIcon icon="fa-solid fa-folder-tree" aria-hidden="true" />
+      <span class="ms-1">Package</span>
+    </button>
+    <button class="btn btn-primary" @click="showFileModal">
+      <FontAwesomeIcon icon="fa-solid fa-folder-open" aria-hidden="true" />
+      <span className="ms-1">File</span>
+    </button>
   </div>
-  <div v-else>Error loading param data</div>
 </template>

@@ -31,7 +31,7 @@
 import type { FlextreeNode } from 'd3-flextree'
 import type { Wiring } from './data_types'
 import type { UUIDString, NodeStateValues } from './types'
-import type { DataType } from './data_classes'
+import type { DataContainer } from './data_classes'
 
 export const enum IOKind {
   INPUT,
@@ -54,7 +54,7 @@ export type DataEdgeTerminal = DataEdgePoint & {
   node: FlextreeNode<BTEditorNode>
   index: number
   key: string
-  type: DataType
+  type: DataContainer
   kind: IOKind
 }
 
@@ -86,7 +86,7 @@ export const enum Position {
 
 export type NodeData = {
   key: string
-  type: DataType
+  type: DataContainer
   serialized_value: string
 }
 

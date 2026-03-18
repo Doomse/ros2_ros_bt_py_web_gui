@@ -31,25 +31,28 @@ import * as uuid from 'uuid'
 import type { UUIDMsg, UUIDString, RosTime } from './types/types'
 import { findNodeInTreeList, getNodeStructures } from './tree_selection'
 import { useEditorStore } from './stores/editor'
-import { DataTypeValues, type NodeDataType, type Wiring } from './types/data_types'
+import { DataTypeValues, RosTypeValues, type NodeDataType, type Wiring } from './types/data_types'
 import type { DataEdgeTerminal } from './types/editor_types'
 import {
   BoolType,
+  BuiltinOrRosType,
+  BuiltinType,
   BytesType,
   DictType,
   FloatType,
   IntType,
   ListType,
   PathType,
+  ReferenceType,
   StringType,
-  type DataType
+  type DataContainer
 } from './types/data_classes'
 
 export function parseRosTime(time: RosTime): Date {
   return new Date(time.sec * 1000 + time.nanosec / 1000000)
 }
 
-export function getTypeFromMsg(type_msg: NodeDataType): DataType {
+export function getTypeFromMsg(type_msg: NodeDataType): DataContainer {
   switch (type_msg.type_identifier) {
     case DataTypeValues.BOOL_TYPE:
       return new BoolType(type_msg)
@@ -67,9 +70,59 @@ export function getTypeFromMsg(type_msg: NodeDataType): DataType {
       return new ListType(type_msg)
     case DataTypeValues.DICT_TYPE:
       return new DictType(type_msg)
+    case DataTypeValues.BUILTIN_TYPE:
+      return new BuiltinType(type_msg)
+    case DataTypeValues.BUILTIN_OR_ROS_TYPE:
+      return new BuiltinOrRosType(type_msg)
+    case DataTypeValues.REFERENCE_TYPE:
+      return new ReferenceType(type_msg)
     default:
+      console.log(type_msg)
       throw Error(`Unrecognized data type ${type_msg}`)
   }
+}
+
+export function getDefaultTypeMsg(): NodeDataType {
+  return {
+    type_identifier: DataTypeValues.UNDEFINED_TYPE,
+    allow_static: false,
+    allow_dynamic: true,
+    is_static: false,
+    min_value: '',
+    max_value: '',
+    string_max_length: 0,
+    string_strict_length: false,
+    serialized_value_options: [],
+    reference_target: '',
+    value_type_identifier: [],
+    iterable_max_length: [],
+    iterable_strict_length: [],
+    ros_interface_kind: RosTypeValues.ROS_UNDEFINED,
+    ros_msg_type: '',
+    interface_id: 0
+  }
+}
+
+export function popFromTypeMessage(msg: NodeDataType): [number, boolean, NodeDataType] {
+  const out_msg = structuredClone(msg)
+  const max_length = out_msg.iterable_max_length.pop()!
+  const strict_length = out_msg.iterable_strict_length.pop()!
+  out_msg.type_identifier = out_msg.value_type_identifier.pop()!
+  return [max_length, strict_length, out_msg]
+}
+
+export function pushToTypeMessage(
+  identifier: DataTypeValues,
+  max_length: number,
+  strict_length: boolean,
+  msg: NodeDataType
+): NodeDataType {
+  const out_msg = structuredClone(msg)
+  out_msg.value_type_identifier.push(msg.type_identifier)
+  out_msg.type_identifier = identifier
+  out_msg.iterable_max_length.push(max_length)
+  out_msg.iterable_strict_length.push(strict_length)
+  return out_msg
 }
 
 export function rosToUuid(msg: UUIDMsg): UUIDString {

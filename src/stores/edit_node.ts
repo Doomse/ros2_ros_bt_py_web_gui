@@ -37,6 +37,8 @@ import { useNodesStore } from './nodes'
 import { getTypeFromMsg, uuidToRos } from '@/utils'
 import { findNodeInTreeList, getNodeStructures } from '@/tree_selection'
 import type { NodeData } from '@/types/editor_types'
+import type { NodeIO } from '@/types/data_types'
+import { ReferenceContainer } from '@/types/data_classes'
 
 export enum EditorSelectionSource {
   NONE = 'none',
@@ -110,6 +112,25 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     return true
   }
 
+  function nodeSetInputsOutputs(inputs: NodeIO[], outputs: NodeIO[]) {
+    function mapIOtoData(io: NodeIO): NodeData {
+      return {
+        key: io.key,
+        type: getTypeFromMsg(io.type),
+        serialized_value: io.serialized_value
+      }
+    }
+
+    new_node_inputs.value = inputs.map(mapIOtoData)
+    new_node_outputs.value = outputs.map(mapIOtoData)
+
+    for (const io of new_node_inputs.value.concat(new_node_outputs.value)) {
+      if (io.type instanceof ReferenceContainer) {
+        io.type.setInnerType(new_node_inputs.value)
+      }
+    }
+  }
+
   function nodeListSelectionChange(new_selected_node: DocumentedNode) {
     if (node_has_changed.value) {
       if (
@@ -137,20 +158,7 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     node_is_valid.value = true
     node_is_morphed.value = false
 
-    new_node_inputs.value = new_selected_node.inputs.map((input) => {
-      return {
-        key: input.key,
-        type: getTypeFromMsg(input.type),
-        serialized_value: input.serialized_value
-      }
-    })
-    new_node_outputs.value = new_selected_node.outputs.map((output) => {
-      return {
-        key: output.key,
-        type: getTypeFromMsg(output.type),
-        serialized_value: output.serialized_value
-      }
-    })
+    nodeSetInputsOutputs(new_selected_node.inputs, new_selected_node.outputs)
   }
 
   function editorSelectionChange(
@@ -209,20 +217,7 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     node_is_valid.value = true
     node_is_morphed.value = false
 
-    new_node_inputs.value = new_selected_node.inputs.map((input) => {
-      return {
-        key: input.key,
-        type: getTypeFromMsg(input.type),
-        serialized_value: input.serialized_value
-      }
-    })
-    new_node_outputs.value = new_selected_node.outputs.map((output) => {
-      return {
-        key: output.key,
-        type: getTypeFromMsg(output.type),
-        serialized_value: output.serialized_value
-      }
-    })
+    nodeSetInputsOutputs(new_selected_node.inputs, new_selected_node.outputs)
   }
 
   function selectMultipleNodes(new_selected_node_id_pairs: TreeNodeIdPair[]) {

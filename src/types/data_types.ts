@@ -30,6 +30,34 @@
 
 import type { UUIDMsg } from './types'
 
+export const INT_LIMITS: Record<string, [bigint, bigint]> = {
+  int8: [-(2n ** 7n), 2n ** 7n - 1n],
+  int16: [-(2n ** 15n), 2n ** 15n - 1n],
+  int32: [-(2n ** 31n), 2n ** 31n - 1n],
+  int64: [-(2n ** 63n), 2n ** 63n - 1n],
+  uint8: [0n, 2n ** 8n - 1n],
+  uint16: [0n, 2n ** 16n - 1n],
+  uint32: [0n, 2n ** 32n - 1n],
+  uint64: [0n, 2n ** 64n - 1n]
+}
+
+export const FLOAT_LIMITS: Record<string, [number, number]> = {
+  float32: [-3.4028235e38, 3.4028235e38],
+  float64: [-1.7976931348623157e308, 1.7976931348623157e308]
+}
+
+// Max uint64 value that exactly matches a float64 value
+export const INT_FLOAT_MAX = 2 ** 64 - 1616
+
+export const IDENTIFIER_KEY = 'type_identifier'
+
+export const ELEMENT_KEY = 'element_type'
+
+export type TypeValueOption = {
+  type: string
+  value: Record<string, any>
+}
+
 export const enum DataTypeValues {
   UNDEFINED_TYPE = 0,
   BOOL_TYPE = 1,
@@ -60,16 +88,15 @@ export const enum RosTypeValues {
 }
 
 export type NodeDataType = {
+  [key: string]: any // Enables accessing properties with []
   type_identifier: DataTypeValues
   value_type_identifier: DataTypeValues[]
   allow_dynamic: boolean
   allow_static: boolean
   is_static: boolean
   serialized_value_options: string[]
-  int_min_value: number
-  int_max_value: number
-  float_min_value: number
-  float_max_value: number
+  min_value: string
+  max_value: string
   string_max_length: number
   string_strict_length: boolean
   iterable_max_length: number[]
