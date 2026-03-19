@@ -1,5 +1,5 @@
 <!--
- *  Copyright 2024-2026 FZI Forschungszentrum Informatik
+ *  Copyright 2026 FZI Forschungszentrum Informatik
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
@@ -26,37 +26,48 @@
  *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- -->
+-->
 <script setup lang="ts">
-import type { BuiltinType } from '@/types/data_classes'
-import TypeParamInner from './type_inputs/TypeParamInner.vue'
+import { INT_FLOAT_MAX } from '@/types/data_types'
 import { ref, watch } from 'vue'
 
-const props = defineProps<{
-  type: BuiltinType
-}>()
+const value = defineModel<Record<string, any>>()
 
-const value = defineModel<string, never, Record<string, any>, Record<string, any>>({
-  get(value) {
-    return props.type.parseValue(value)
-  },
-  set(value) {
-    return props.type.serializeValue(value)
+const enable_length_limit = ref<boolean>(value.value!.max_length !== INT_FLOAT_MAX)
+watch(enable_length_limit, (val) => {
+  if (value.value === undefined) {
+    return
+  }
+  if (!val) {
+    value.value.max_length = INT_FLOAT_MAX
+    value.value.strict_length = false
   }
 })
-
-// We can't directly pass the value through (by doing `v-model="value"`)
-//   because the serialization step for the outer model breaks deep reactivity
-const inner_value = ref<Record<string, any>>(value.value || {})
-watch(
-  inner_value,
-  (val) => {
-    value.value = val
-  },
-  { deep: true }
-)
 </script>
 
 <template>
-  <TypeParamInner v-model="inner_value" :type="type" />
+  <div v-if="value !== undefined" class="row mx-0 mb-1">
+    <div class="input-group input-group-sm">
+      <span class="input-group-text">Length:</span>
+      <input
+        v-model="value.max_length"
+        type="number"
+        class="form-control"
+        :disabled="!enable_length_limit"
+      />
+      <span class="input-group-text">
+        <input v-model="enable_length_limit" type="checkbox" />
+      </span>
+    </div>
+    <div class="form-check ms-3">
+      <input
+        v-model="value.strict_length"
+        type="checkbox"
+        class="form-check-input"
+        :disabled="!enable_length_limit"
+      />
+      <label class="form-check-label">Strict</label>
+    </div>
+  </div>
+  <div v-else>Error loading param data</div>
 </template>

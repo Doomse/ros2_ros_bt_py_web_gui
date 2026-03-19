@@ -1,5 +1,5 @@
 <!--
- *  Copyright 2024-2026 FZI Forschungszentrum Informatik
+ *  Copyright 2026 FZI Forschungszentrum Informatik
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
@@ -26,37 +26,60 @@
  *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- -->
+-->
 <script setup lang="ts">
-import type { BuiltinType } from '@/types/data_classes'
-import TypeParamInner from './type_inputs/TypeParamInner.vue'
+import { FLOAT_LIMITS } from '@/types/data_types'
 import { ref, watch } from 'vue'
 
-const props = defineProps<{
-  type: BuiltinType
-}>()
+const min_value = defineModel<string>('min_value')
+const max_value = defineModel<string>('max_value')
 
-const value = defineModel<string, never, Record<string, any>, Record<string, any>>({
-  get(value) {
-    return props.type.parseValue(value)
-  },
-  set(value) {
-    return props.type.serializeValue(value)
+const float_choice_order = ['float32', 'float64', 'custom']
+
+let init_min_max_option = 'custom'
+for (const [key, [min, max]] of Object.entries(FLOAT_LIMITS)) {
+  if (min.toString() === min_value.value && max.toString() === max_value.value) {
+    init_min_max_option = key
+  }
+}
+
+const min_max_option = ref<string>(init_min_max_option)
+watch(min_max_option, (val) => {
+  if (Object.keys(FLOAT_LIMITS).includes(val)) {
+    min_value.value = FLOAT_LIMITS[val][0].toString()
+    max_value.value = FLOAT_LIMITS[val][1].toString()
   }
 })
-
-// We can't directly pass the value through (by doing `v-model="value"`)
-//   because the serialization step for the outer model breaks deep reactivity
-const inner_value = ref<Record<string, any>>(value.value || {})
-watch(
-  inner_value,
-  (val) => {
-    value.value = val
-  },
-  { deep: true }
-)
 </script>
 
 <template>
-  <TypeParamInner v-model="inner_value" :type="type" />
+  <div class="row mx-0 mb-1">
+    <div v-for="opt in float_choice_order" class="col-6" :key="opt">
+      <div class="form-check">
+        <input
+          type="radio"
+          class="form-check-input"
+          :checked="opt === min_max_option"
+          @change="min_max_option = opt"
+        />
+        <label>{{ opt }}</label>
+      </div>
+    </div>
+    <div class="input-group input-group-sm">
+      <span class="input-group-text">Min:</span>
+      <input
+        v-model="min_value"
+        type="number"
+        class="form-control"
+        :disabled="min_max_option !== 'custom'"
+      />
+      <span class="input-group-text">Max:</span>
+      <input
+        v-model="max_value"
+        type="number"
+        class="form-control"
+        :disabled="min_max_option !== 'custom'"
+      />
+    </div>
+  </div>
 </template>

@@ -116,6 +116,33 @@ export class BoolType extends BuiltinContainer<boolean> {
   }
 }
 
+export class BlankType extends BuiltinContainer<any> {
+  constructor(type_msg: NodeDataType) {
+    if (type_msg.type_identifier !== DataTypeValues.BLANK_TYPE) {
+      throw Error(`Type msg ${type_msg} has incorrect identifier for object`)
+    }
+    super(type_msg)
+  }
+
+  toTypeMsg(): NodeDataType {
+    const type_msg = super.toTypeMsg()
+    type_msg.type_identifier = DataTypeValues.BLANK_TYPE
+    return type_msg
+  }
+
+  isCompatible(other: DataContainer): boolean {
+    return other instanceof BlankType
+  }
+
+  prettyprint(): string {
+    return 'object'
+  }
+
+  getSerializedDefault(): string {
+    return this.serializeValue(false)
+  }
+}
+
 export class IntType extends DataContainer<bigint> {
   min_value: bigint
   max_value: bigint
@@ -586,7 +613,12 @@ export class BuiltinType extends BuiltinContainer<Record<string, any>> {
     }
     const type_msg = getDefaultTypeMsg()
     for (const [k, v] of Object.entries(value)) {
-      type_msg[k] = v
+      if (k === 'max_length' || k === 'strict_length') {
+        const new_k = `string_${k}`
+        type_msg[new_k] = v
+      } else {
+        type_msg[k] = v
+      }
     }
     return type_msg
   }
@@ -604,13 +636,22 @@ export class BuiltinType extends BuiltinContainer<Record<string, any>> {
 export class BuiltinOrRosType extends DataContainer<any> {
   inner_type: BuiltinType
 
+  get valid_types() {
+    return this.inner_type.valid_types
+  }
+
   constructor(type_msg: NodeDataType) {
     if (type_msg.type_identifier !== DataTypeValues.BUILTIN_OR_ROS_TYPE) {
       throw Error(`Type msg ${type_msg} has incorrect identifier for builtin`)
     }
     super(type_msg)
-    type_msg.type_identifier = DataTypeValues.BUILTIN_TYPE
-    this.inner_type = new BuiltinType(type_msg)
+    const inner_type_msg = getDefaultTypeMsg()
+    inner_type_msg.type_identifier = DataTypeValues.BUILTIN_TYPE
+    inner_type_msg.allow_dynamic = type_msg.allow_dynamic
+    inner_type_msg.allow_static = type_msg.allow_static
+    inner_type_msg.is_static = type_msg.is_static
+    inner_type_msg.serialized_value_options = type_msg.serialized_value_options
+    this.inner_type = new BuiltinType(inner_type_msg)
   }
 
   toTypeMsg(): NodeDataType {

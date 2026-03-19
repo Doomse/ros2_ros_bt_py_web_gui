@@ -107,5 +107,5 @@ const param_component = computed<Component | undefined>(() => {
     v-model="value"
     :type="type"
   />
-  <div v-else>Unknown param type {{ type }}</div>
+  <div v-else>Unknown param type</div>
 </template>

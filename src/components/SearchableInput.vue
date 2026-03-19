@@ -104,7 +104,7 @@ function releaseDropdown() {
 <template>
   <input
     type="text"
-    class="form-control mt-2"
+    class="form-control"
     :class="{ 'is-invalid': is_invalid }"
     :value="selected_value"
     @input="onInput"
