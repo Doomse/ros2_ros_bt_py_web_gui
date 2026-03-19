@@ -73,16 +73,18 @@ import { IOKind } from '@/types/editor_types'
 export function getDataVertOffsets(data_list: NodeData[]): number[] {
   let vertical_offset = io_gripper_spacing
   let previous_prefix = ''
-  const offsets = data_list.map((data, index) => {
-    const key_prefix = data.key.split('.').slice(0, -1).join('.')
-    if (key_prefix !== previous_prefix && index > 0) {
-      vertical_offset += io_gripper_spacing
-    }
-    const old_vertical_offset = vertical_offset
-    vertical_offset += io_gripper_size + io_gripper_spacing
-    previous_prefix = key_prefix
-    return old_vertical_offset
-  })
+  const offsets = data_list
+    .filter((data) => !data.type.is_static)
+    .map((data, index) => {
+      const key_prefix = data.key.split('.').slice(0, -1).join('.')
+      if (key_prefix !== previous_prefix && index > 0) {
+        vertical_offset += io_gripper_spacing
+      }
+      const old_vertical_offset = vertical_offset
+      vertical_offset += io_gripper_size + io_gripper_spacing
+      previous_prefix = key_prefix
+      return old_vertical_offset
+    })
   offsets.push(vertical_offset)
   return offsets
 }
@@ -350,29 +352,33 @@ export class D3TreeDataDisplay {
       }
 
       const input_offsets = getDataVertOffsets(node.data.inputs)
-      node.data.inputs.map((input: NodeData, index: number) => {
-        data_points.push({
-          node: node,
-          index: index,
-          kind: IOKind.INPUT,
-          key: input.key,
-          type: input.type,
-          x: node.x - node.data.size.width * 0.5 - io_gripper_size,
-          y: node.y + input_offsets[index]
+      node.data.inputs
+        .filter((input: NodeData) => !input.type.is_static)
+        .map((input: NodeData, index: number) => {
+          data_points.push({
+            node: node,
+            index: index,
+            kind: IOKind.INPUT,
+            key: input.key,
+            type: input.type,
+            x: node.x - node.data.size.width * 0.5 - io_gripper_size,
+            y: node.y + input_offsets[index]
+          })
         })
-      })
       const output_offsets = getDataVertOffsets(node.data.outputs)
-      node.data.outputs.map((output: NodeData, index: number) => {
-        data_points.push({
-          node: node,
-          index: index,
-          kind: IOKind.OUTPUT,
-          key: output.key,
-          type: output.type,
-          x: node.x + node.data.size.width * 0.5,
-          y: node.y + output_offsets[index]
+      node.data.outputs
+        .filter((output: NodeData) => !output.type.is_static)
+        .map((output: NodeData, index: number) => {
+          data_points.push({
+            node: node,
+            index: index,
+            kind: IOKind.OUTPUT,
+            key: output.key,
+            type: output.type,
+            x: node.x + node.data.size.width * 0.5,
+            y: node.y + output_offsets[index]
+          })
         })
-      })
     })
 
     return data_points
@@ -431,17 +437,11 @@ export class D3TreeDataDisplay {
             console.warn('Unintended data edge draw')
             return
           }
-
           if (!typesCompatible(term, editor_store.data_edge_endpoint)) {
             console.warn('Invalid edge')
             return
           }
-
-          if (term.kind === IOKind.INPUT) {
-            addDataEdge(editor_store.data_edge_endpoint, term)
-          } else {
-            addDataEdge(term, editor_store.data_edge_endpoint)
-          }
+          addDataEdge(term, editor_store.data_edge_endpoint)
         })
     }
 

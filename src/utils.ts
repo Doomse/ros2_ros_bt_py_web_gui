@@ -32,7 +32,7 @@ import type { UUIDMsg, UUIDString, RosTime } from './types/types'
 import { findNodeInTreeList, getNodeStructures } from './tree_selection'
 import { useEditorStore } from './stores/editor'
 import { DataTypeValues, RosTypeValues, type NodeDataType, type Wiring } from './types/data_types'
-import type { DataEdgeTerminal } from './types/editor_types'
+import { IOKind, type DataEdgeTerminal, type NodeData } from './types/editor_types'
 import {
   BlankType,
   BoolType,
@@ -44,6 +44,7 @@ import {
   IntType,
   ListType,
   PathType,
+  ReferenceContainer,
   ReferenceType,
   StringType,
   type DataContainer
@@ -128,6 +129,14 @@ export function pushToTypeMessage(
   return out_msg
 }
 
+export function initializeReferenceContainers(inputs: NodeData[], outputs: NodeData[]) {
+  for (const io of inputs.concat(outputs)) {
+    if (io.type instanceof ReferenceContainer) {
+      io.type.setInnerType(inputs)
+    }
+  }
+}
+
 export function rosToUuid(msg: UUIDMsg): UUIDString {
   if (!uuid.validate(msg)) {
     throw TypeError(`Message ${msg} is not a valid uuid`)
@@ -175,12 +184,32 @@ export function compareWirings(w1: Wiring, w2: Wiring): boolean {
   )
 }
 
-export function typesCompatible(source: DataEdgeTerminal, target: DataEdgeTerminal) {
+export function typesCompatible(t1: DataEdgeTerminal, t2: DataEdgeTerminal) {
+  let source: DataEdgeTerminal
+  let target: DataEdgeTerminal
+  if (t1.kind === IOKind.INPUT && t2.kind === IOKind.OUTPUT) {
+    source = t2
+    target = t1
+  } else if (t1.kind === IOKind.OUTPUT && t2.kind === IOKind.INPUT) {
+    source = t1
+    target = t2
+  } else {
+    return false
+  }
+
   if (source.node.data.node_id === target.node.data.node_id) {
     return false
   }
 
-  return source.type.isCompatible(target.type)
+  let source_type = source.type
+  let target_type = target.type
+  if (source_type instanceof ReferenceContainer) {
+    source_type = source_type.getInnerType() || source.type
+  }
+  if (target_type instanceof ReferenceContainer) {
+    target_type = target_type.getInnerType() || target.type
+  }
+  return target_type.isCompatible(source_type)
 }
 
 export function getShortDoc(doc: string) {

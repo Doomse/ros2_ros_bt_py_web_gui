@@ -34,7 +34,7 @@ import * as d3 from 'd3'
 import type { HierarchyNode, HierarchyLink } from 'd3-hierarchy'
 import { flextree, type FlextreeNode } from 'd3-flextree'
 import * as uuid from 'uuid'
-import { getTypeFromMsg, rosToUuid } from '@/utils'
+import { getTypeFromMsg, initializeReferenceContainers, rosToUuid } from '@/utils'
 import {
   tree_node_css_class,
   node_body_css_class,
@@ -543,7 +543,7 @@ export class D3TreeDisplay {
     // Trim the serialized data values from the node data - we won't
     // render them, so don't clutter the DOM with the data
     const editor_nodes: BTEditorNode[] = tree_structure.nodes.map((node) => {
-      return {
+      const out_node = {
         node_id: rosToUuid(node.node_id),
         name: node.name,
         node_class: node.node_class,
@@ -569,6 +569,8 @@ export class D3TreeDisplay {
         size: { width: 1, height: 1 },
         offset: { x: 0, y: 0 }
       } as BTEditorNode
+      initializeReferenceContainers(out_node.inputs, out_node.outputs)
+      return out_node
     })
 
     const forest_root: BTEditorNode = {

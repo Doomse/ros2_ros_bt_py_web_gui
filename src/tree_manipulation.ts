@@ -37,7 +37,7 @@ import type { WireNodeDataRequest, WireNodeDataResponse } from './types/services
 import type { UUIDString, NodeStructure, DocumentedNode } from './types/types'
 import { rosToUuid, uuidToRos } from './utils'
 import { notify } from '@kyvg/vue3-notification'
-import type { DataEdgeTerminal } from './types/editor_types'
+import { IOKind, type DataEdgeTerminal } from './types/editor_types'
 import type { Wiring } from './types/data_types'
 
 export function buildDefaultNodeMessage(node: DocumentedNode): NodeStructure {
@@ -62,6 +62,8 @@ export function addNode(
   send_notify: boolean = true
 ): Promise<UUIDString> {
   const ros_store = useROSStore()
+
+  console.log(msg)
 
   // Supress notifications for all callbacks
   let local_notify: (args: object) => void
@@ -260,13 +262,26 @@ export function replaceNode(
   })
 }
 
-// Caller needs to ensure to pass the input as source
 export function addDataEdge(
-  source: DataEdgeTerminal,
-  target: DataEdgeTerminal,
+  t1: DataEdgeTerminal,
+  t2: DataEdgeTerminal,
   send_notify: boolean = true
 ): Promise<void> {
   const ros_store = useROSStore()
+
+  let source: DataEdgeTerminal
+  let target: DataEdgeTerminal
+  if (t1.kind === IOKind.INPUT && t2.kind === IOKind.OUTPUT) {
+    source = t2
+    target = t1
+  } else if (t1.kind === IOKind.OUTPUT && t2.kind === IOKind.INPUT) {
+    source = t1
+    target = t2
+  } else {
+    throw Error(`Given terminals aren't an input output combination: ${t1}, ${t2}`)
+  }
+
+  console.log(source, target)
 
   // Supress notifications for all callbacks
   let local_notify: (args: object) => void
@@ -283,12 +298,10 @@ export function addDataEdge(
           {
             source: {
               node_id: uuidToRos(source.node.data.node_id),
-              data_kind: source.kind,
               data_key: source.key
             },
             target: {
               node_id: uuidToRos(target.node.data.node_id),
-              data_kind: target.kind,
               data_key: target.key
             }
           } as Wiring

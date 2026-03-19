@@ -34,11 +34,10 @@ import { computed, ref } from 'vue'
 import * as uuid from 'uuid'
 import { useEditorStore } from './editor'
 import { useNodesStore } from './nodes'
-import { getTypeFromMsg, uuidToRos } from '@/utils'
+import { getTypeFromMsg, initializeReferenceContainers, uuidToRos } from '@/utils'
 import { findNodeInTreeList, getNodeStructures } from '@/tree_selection'
 import type { NodeData } from '@/types/editor_types'
 import type { NodeIO } from '@/types/data_types'
-import { ReferenceContainer } from '@/types/data_classes'
 
 export enum EditorSelectionSource {
   NONE = 'none',
@@ -124,11 +123,7 @@ export const useEditNodeStore = defineStore('edit_node', () => {
     new_node_inputs.value = inputs.map(mapIOtoData)
     new_node_outputs.value = outputs.map(mapIOtoData)
 
-    for (const io of new_node_inputs.value.concat(new_node_outputs.value)) {
-      if (io.type instanceof ReferenceContainer) {
-        io.type.setInnerType(new_node_inputs.value)
-      }
-    }
+    initializeReferenceContainers(new_node_inputs.value, new_node_outputs.value)
   }
 
   function nodeListSelectionChange(new_selected_node: DocumentedNode) {
